@@ -108,38 +108,49 @@ def impute_information(context,vols):
 
     # Check if the sex or age column has empty values
     columns = ['sex','age']
-    #has_empty_values = df[column_name].isnull().any()
+    df.loc[df['age'] < 0, 'age'] = pd.NA #some sites fill in age_at_scan with one month before DOB
 
-    
-
+    mask = df['sex'].isna() | (df['age'] < 0) | (df['age'].isna())
     #For every session get the sex information for those with missing
-    for index, row in df.iterrows():
+    for index, row in df[mask].iterrows():
         subject_label = row['subject']
         session_label = row['session']
         # Find the subject by label
         subject = next((s for s in project.subjects() if s.label == subject_label), None)
-
-        
+        if not subject:
+            continue
         subject = subject.reload()
+
         session = next((s for s in subject.sessions() if s.label == session_label), None)
+        if not session:
+            continue
         session = session.reload()
 
         for column_name in columns:
             if column_name == 'sex':
-                df.at[index, column_name] = subject.sex
-                print(f"Imputing {column_name} for subject: {subject_label}: {subject.sex}")
-            else:
+                if subject.sex != None:
+                    df.at[index, column_name] = subject.sex
+                    print(f"Imputing {column_name} for subject: {subject_label}: {subject.sex}")
+            elif column_name == 'age':
                 #get either session information (age_months) session
                 if session.info != {}:
                     key_with_age = [key for key in session.info if 'age' in key]
-                    age = session.info[key_with_age[0]]
-                    df.at[index, column_name] = age
-                    
-                    print(f"Imputing {column_name} for subject: {subject_label}: {age}")
+                    if key_with_age:
+                        age = session.info[key_with_age[0]]
+                        df.at[index, {column_name}] = age
+                        print(f"Imputing {column_name} for subject: {subject_label}: {age}")
                 else:  
-                    df.at[index, column_name] = session.age_years * 12 #Flywheel session age is in years, convert to months
-                    print(f"Imputing {column_name} for subject: {subject_label}: {session.age_years * 12}")
+                    if session.age_years != None:
+                        df.at[index, column_name] = session.age_years * 12 #Flywheel session age is in years, convert to months
+                        print(f"Imputing {column_name} for subject: {subject_label}: {session.age_years * 12}")
 
+    
+    #Harmonise sex values
+    sex_map = {'female': 'F', 'Female': 'F', 'male': 'M', 'Male': 'M'}
+
+    # Apply mapping after converting to lowercase
+    df['sex'] = df['sex'].str.lower().map(sex_map)
+    
     #Printing the modified csv to the input directory to be used for plotting
     df.to_csv(os.path.join(input_path,vols),index=False)
 
@@ -149,6 +160,7 @@ def impute_information(context,vols):
     #if data frame is not empty, save it
     if missing_info.empty == False:
         missing_info.to_csv(os.path.join(output_path,"missing_sex_age_info.csv"),index=False)
+
 
 def rename_columns (vols):
 
@@ -173,8 +185,8 @@ def rename_columns (vols):
 
     df.columns = df.columns.str.replace('_', ' ').str.replace('-', ' ').str.lower()
     df.to_csv(os.path.join(input_path,vols),index=False)
-    print(os.path.join(input_path,vols))
-    df.to_csv(os.path.join(input_path,"updated_headers.csv"),index=False)
+    #print(os.path.join(input_path,vols))
+    #df.to_csv(os.path.join(input_path,"updated_headers_.csv"),index=False)
 
     print("file saved...")
 

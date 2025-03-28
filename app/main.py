@@ -13,12 +13,16 @@ import statsmodels.api as sm
 import textwrap
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 import pandas as pd
 from matplotlib.backends.backend_pdf import PdfPages
 import os
 import itertools
+import warnings
 
 from utils.format import beautify_report, scale_image, simplify_label, generate_on_page
+
+warnings.simplefilter('ignore', np.RankWarning)
 
 output_dir ='/flywheel/v0/output/'
 workdir = '/flywheel/v0/work/'
@@ -155,7 +159,7 @@ def create_cover_page(user, input_labels, age_range, age_min, age_max, threshold
                             f"1. Age Range: {age_min}-{age_max} months<br/>"
                             f"2. Outlier Threshold: ±{threshold} SD<br/>"
                             "3. Polynomial Fit: Degree 3 (Cubic)<br/>"
-                            "4. Confidence Interval: 95% <br/>"
+                            "4. Confidence Interval: 95% <br/><br/>"
                             f"<i>Input file used: {input_labels['volumetric']}</i>")
     
     stylesheet = getSampleStyleSheet()
@@ -201,7 +205,7 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, threshold):
     global bins_mapping
         
     # Example DataFrame with ages in months
-    df = pd.read_csv(filepath)
+    df = pd.read_csv(filepath) #
     n_sessions = df['session'].nunique()  # Number of unique sessions
     print("Number of unique sessions: ", n_sessions)
    
@@ -217,6 +221,7 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, threshold):
 
     # A simple heuristic: if the maximum value is above a threshold, consider it as days
     threshold = 100  # adjust based on your dataset context
+    print("Max age: ", df['age'].max())
     if df['age'].max() > threshold:
         print("The age values are likely in days.")
         # Rename the 'age' column to 'age_in_days'
@@ -228,6 +233,10 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, threshold):
         
 
     df['age_group'] = pd.cut(df['age_in_months'], bins=bins, labels=labels, right=False)
+
+    print("NA Sex:", df.sex.isna().sum())
+    print("NA Age:", df.age_in_months.isna().sum())
+    print('NA TICV:', df['total intracranial'].isna().sum())
 
     # Group by sex and age group
     grouped = df.groupby(['sex', 'age_group'])
@@ -257,9 +266,6 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, threshold):
     used_age_groups = [age for age in labels if age in df['age_group'].unique()]
     # Calculate the count of participants per age group``
     age_group_counts = df['age_group'].value_counts().sort_index()
-
-    # Create new labels with counts
-    age_group_labels = [f"{label}\n(n={age_group_counts[label]})" for label in used_age_groups]
 
     # Ensure that 'age_group' is treated as a categorical variable with the correct order (only for used categories)
     df['age_group'] = pd.Categorical(df['age_group'], categories=used_age_groups, ordered=True)
@@ -302,7 +308,7 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, threshold):
     upper_age_limit = age_max
     lower_age_limit = age_min  
 
-    # Filter the data to include only observations up to 30 months
+    # Filter the data to include only observations up to the requested limit
     filtered_df = clean_df[(clean_df['age_in_months'] <= upper_age_limit) & (clean_df['age_in_months'] >= lower_age_limit)]
 
     n = len(filtered_df)  # Number of observations in the filtered data
@@ -316,8 +322,6 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, threshold):
     # Filter out age groups with a count of 0
     age_group_counts = age_group_counts[age_group_counts > 0]
 
-    # Create a new label for each age group that includes the count
-    age_group_labels = [f"{label}\n(n={age_group_counts[label]})" for label in age_group_counts.index]
 
     # Group by sex and age group and calculate the necessary statistics
     summary_table = clean_df.groupby(['age_group', 'sex']).agg({
@@ -328,7 +332,6 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, threshold):
 
     # Remove rows where the mean of 'total intracranial' is NaN
     summary_table = summary_table.dropna(subset=[('total intracranial', 'mean')])
-
     # Pivot the table to have Sex as columns and Age Group as a single row index
     summary_table = summary_table.pivot(index='age_group', columns='sex')
 
@@ -360,6 +363,28 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, threshold):
     plt.title('Distribution of TICV of outliers vs non-outliers')
     plt.legend()
     plt.savefig(os.path.join(workdir, "outlier_icv_plot.png"))
+
+    # Count missing values
+    missing_counts = df[["age_in_months", "sex"]].isna().sum()
+    
+    # Plot
+    plt.figure(figsize=(6, 4))
+    missing_counts.plot(kind="bar", color="#D96B6B", linewidth=1)
+
+    # Styling
+    plt.ylabel("Number of observations")
+    plt.title("Missing metadata")
+    plt.xticks(rotation=0)  # Keep labels horizontal
+
+    # Add explanation text below the plot
+    plt.figtext(0.13, 0.28, 
+                "Missing sex and age information affects the usability of this report.\n"
+                "Please ensure the metadata is available in your project.\nn"
+               )  # Added padding for better spacing
+
+
+    plt.savefig(os.path.join(output_dir, "missing_metadata.png"))
+
 
     return df, summary_table, filtered_df, n, n_projects, n_sessions, n_clean_sessions, outlier_n, project_labels, labels
 
@@ -583,7 +608,7 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
             x='age_in_months', 
             y='total intracranial', 
             data=sex_df, 
-            order=2,  # Polynomial degree (3 for cubic)
+            order=3,  # Polynomial degree (3 for cubic)
             scatter=False, 
             ci=95,  # Confidence interval
             ax=ax
@@ -770,7 +795,7 @@ def generate_qc_report (input_dir, input_labels,project_labels) :
         )
 
         # Set title and labels directly on ax
-        ax.set_title('Monthly Percentage of (QC_all) Failures')
+        ax.set_title('Monthly Percentage of QC Failures')
         ax.set_xlabel('Year-Month')
         ax.set_ylabel('Percentage of Failures (%)')
         ax.tick_params(axis='x', rotation=45)  # Rotate x-axis labels for readability

@@ -65,7 +65,7 @@
     },
     "gear-builder": {
       "category": "analysis",
-      "image": "flywheel/volumetrics:0.0.13"
+      "image": "flywheel/volumetrics:0.0.14"
     },
     "kcl-app-binary": "app/main.py",
     "kcl-app-modalities": [
@@ -133,5 +133,5 @@
   "name": "volumetrics",
   "source": "",
   "url": "",
-  "version": "0.0.13"
+  "version": "0.0.14"
 }
