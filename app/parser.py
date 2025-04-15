@@ -48,6 +48,7 @@ def parse_config(context):
     age_max = context.config.get("age_max")
     age_range = context.config.get("age_range")
     threshold = context.config.get("threshold")
+    age_unit = context.config.get("age_unit")
 
     # -------------------  Get Input label -------------------  #
 
@@ -72,12 +73,12 @@ def parse_config(context):
                 input_labels['volumetric'] = filename
                 #break
 
-    print("Input files found: ", input_labels)
+    log.info(f"Input files found: {input_labels}")
 
     impute_information(context,input_labels['volumetric'])
     rename_columns (input_labels['volumetric'])
 
-    return user, df, input_labels, age_range, age_min, age_max, threshold, project_container, input_path, api_key
+    return user, df, input_labels, age_range, age_min, age_max, age_unit, threshold, project_container, input_path, api_key
 
 
 def impute_information(context,vols):
@@ -127,22 +128,27 @@ def impute_information(context,vols):
         session = session.reload()
 
         for column_name in columns:
-            if column_name == 'sex':
-                if subject.sex != None:
-                    df.at[index, column_name] = subject.sex
-                    print(f"Imputing {column_name} for subject: {subject_label}: {subject.sex}")
-            elif column_name == 'age':
-                #get either session information (age_months) session
-                if session.info != {}:
-                    key_with_age = [key for key in session.info if 'age' in key]
-                    if key_with_age:
-                        age = session.info[key_with_age[0]]
-                        df.at[index, {column_name}] = age
-                        print(f"Imputing {column_name} for subject: {subject_label}: {age}")
-                else:  
-                    if session.age_years != None:
-                        df.at[index, column_name] = session.age_years * 12 #Flywheel session age is in years, convert to months
-                        print(f"Imputing {column_name} for subject: {subject_label}: {session.age_years * 12}")
+            try:
+                if column_name == 'sex':
+                    if subject.sex != None:
+                        df.at[index, column_name] = subject.sex
+                        log.info(f"Imputing {column_name} for subject: {subject_label}: {subject.sex}")
+                elif column_name == 'age':
+                    #get either session information (age_months) session
+                    if session.info != {}:
+                        key_with_age = [key for key in session.info if 'age' in key]
+                        log.info(session.info)
+                        if key_with_age:
+                            age = session.info[key_with_age[0]]
+                            log.info(age)
+                            df.at[index, {column_name}] = age
+                            log.info(f"Imputing {column_name} for subject: {subject_label}: {age}")
+                    else:  
+                        if session.age_years != None:
+                            df.at[index, column_name] = session.age_years * 12 #Flywheel session age is in years, convert to months
+                            log.info(f"Imputing {column_name} for subject: {subject_label}: {session.age_years * 12}")
+            except Exception as e:
+                log.info(f"Error imputing {column_name} for subject: {subject_label}: {e}")
 
     
     #Harmonise sex values
@@ -164,7 +170,7 @@ def impute_information(context,vols):
 
 def rename_columns (vols):
 
-    print('RENAMING COLUMNS....')
+    log.info('RENAMING COLUMNS....')
 
     input_path = '/flywheel/v0/input/input'
     df = pd.read_csv(os.path.join(input_path,vols))
@@ -180,7 +186,7 @@ def rename_columns (vols):
         if keyword in vols:
             column_mapping = name_key_maping[keyword]
             df.rename(columns=column_mapping,inplace=True)
-            print('Column has been renamed')
+            log.info('Column has been renamed')
         
 
     df.columns = df.columns.str.replace('_', ' ').str.replace('-', ' ').str.lower()
@@ -188,5 +194,5 @@ def rename_columns (vols):
     #print(os.path.join(input_path,vols))
     #df.to_csv(os.path.join(input_path,"updated_headers_.csv"),index=False)
 
-    print("file saved...")
+    log.info("file saved...")
 

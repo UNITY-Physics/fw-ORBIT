@@ -39,7 +39,17 @@
       "maximum": 6,
       "minimum": 1,
       "type": "number"
-    }
+    },
+    "age_unit": {
+      "description": "Specify the age unit used in your provided dataset.",
+      "type": "string",
+      "enum": [
+          "days",
+          "weeks",
+          "months",
+          "years"
+        ]
+      }
   },
   "custom": {
     "analysis-level": "project",
@@ -65,7 +75,7 @@
     },
     "gear-builder": {
       "category": "analysis",
-      "image": "flywheel/volumetrics:0.0.14"
+      "image": "flywheel/volumetrics:0.0.15"
     },
     "kcl-app-binary": "app/main.py",
     "kcl-app-modalities": [
@@ -133,5 +143,5 @@
   "name": "volumetrics",
   "source": "",
   "url": "",
-  "version": "0.0.14"
+  "version": "0.0.15"
 }
