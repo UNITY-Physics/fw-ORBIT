@@ -44,12 +44,12 @@
       "description": "Specify the age unit used in your provided dataset.",
       "type": "string",
       "enum": [
-          "days",
-          "weeks",
-          "months",
-          "years"
-        ]
-      }
+        "days",
+        "weeks",
+        "months",
+        "years"
+      ]
+    }
   },
   "custom": {
     "analysis-level": "project",
@@ -75,7 +75,7 @@
     },
     "gear-builder": {
       "category": "analysis",
-      "image": "flywheel/volumetrics:0.0.15"
+      "image": "flywheel/volumetrics:0.0.16"
     },
     "kcl-app-binary": "app/main.py",
     "kcl-app-modalities": [
@@ -143,5 +143,5 @@
   "name": "volumetrics",
   "source": "",
   "url": "",
-  "version": "0.0.15"
+  "version": "0.0.16"
 }

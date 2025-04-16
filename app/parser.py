@@ -54,6 +54,7 @@ def parse_config(context):
 
     # Specify the directory you want to list files from
     input_path = '/flywheel/v0/input/input'
+    work_path = '/flywheel/v0/work'
     # List all files in the specified directory
     #recon-all output, QC output , [add more as needed]
     input_labels = {} 
@@ -75,10 +76,10 @@ def parse_config(context):
 
     log.info(f"Input files found: {input_labels}")
 
-    impute_information(context,input_labels['volumetric'])
-    rename_columns (input_labels['volumetric'])
+    df_path = impute_information(context,input_labels['volumetric'])
+    df_path = rename_columns (input_labels['volumetric'])
 
-    return user, df, input_labels, age_range, age_min, age_max, age_unit, threshold, project_container, input_path, api_key
+    return user, df, input_labels, age_range, age_min, age_max, age_unit, threshold, project_container, df_path, api_key
 
 
 def impute_information(context,vols):
@@ -103,6 +104,8 @@ def impute_information(context,vols):
 
     input_path = '/flywheel/v0/input/input'
     output_path = '/flywheel/v0/output'
+    work_path = '/flywheel/v0/work'
+
     df = pd.read_csv(os.path.join(input_path,vols))
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
 
@@ -158,7 +161,8 @@ def impute_information(context,vols):
     df['sex'] = df['sex'].str.lower().map(sex_map)
     
     #Printing the modified csv to the input directory to be used for plotting
-    df.to_csv(os.path.join(input_path,vols),index=False)
+    df_path = os.path.join(work_path,vols)
+    df.to_csv(df_path,index=False)
 
     #saving those with missing sex/age information to a separate file
     missing_info = df[df.isnull().any(axis=1)][['subject','session','age','sex','acquisition']]
@@ -167,13 +171,16 @@ def impute_information(context,vols):
     if missing_info.empty == False:
         missing_info.to_csv(os.path.join(output_path,"missing_sex_age_info.csv"),index=False)
 
+    return df_path
 
 def rename_columns (vols):
 
-    log.info('RENAMING COLUMNS....')
+    log.info('Renaming ICV columns....')
 
     input_path = '/flywheel/v0/input/input'
-    df = pd.read_csv(os.path.join(input_path,vols))
+    work_path = '/flywheel/v0/work'
+
+    df = pd.read_csv(os.path.join(work_path,vols))
     
 
     name_key_maping = {
@@ -190,9 +197,13 @@ def rename_columns (vols):
         
 
     df.columns = df.columns.str.replace('_', ' ').str.replace('-', ' ').str.lower()
-    df.to_csv(os.path.join(input_path,vols),index=False)
+    df_path = os.path.join(work_path,vols)
+
+    df.to_csv(df_path,index=False)
+
     #print(os.path.join(input_path,vols))
     #df.to_csv(os.path.join(input_path,"updated_headers_.csv"),index=False)
 
-    log.info("file saved...")
+    log.info("File saved...")
+    return df_path
 

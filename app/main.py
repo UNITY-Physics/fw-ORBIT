@@ -143,13 +143,13 @@ def create_cover_page(user, input_labels, age_range, age_min, age_max, age_unit,
     text = ("This report provides a detailed summary of the input-derived data. "
             "The data are analyzed by age group and sex. Analyses include the calculation of brain volume z-scores for different age groups, summary descriptive statistics of the total intracranial volume (TICV), and the age distribution in the cohort. of brain volume z-scores for different age groups."
             f"List of outliers has been generated based on z-scores outside of ±{threshold} SD. "
-            "Custom options such as age filtering and polynomial fitting have been applied to the data."
+            "Custom options such as age filtering and cubic spline fitting have been applied to the data."
             f"<b><br/><br/>Project Description:</b> {project.description}")
     
     custom_options_text = ( f"<br/><br/>Custom Options used:<br />"
                             f"1. Age Range: {age_min}-{age_max} months<br/>"
                             f"2. Outlier Threshold: ±{threshold} SD<br/>"
-                            "3. Polynomial Fit: Degree 3 (Cubic)<br/>"
+                            "3. Cubic Spline Regression Fit: Degree 3<br/>"
                             "4. Confidence Interval: 95% <br/><br/>"
                             f"<i>Input file used: {input_labels['volumetric']}</i>")
     
@@ -290,12 +290,17 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, age_unit, th
     
     # Save the filtered DataFrame to a CSV file
     outliers_df.to_csv(os.path.join(output_dir,'outliers_list.csv'), index=False)
-    outlier_n = len(outliers_df)
+    print(outliers_df)
+    
+    outlier_n = outliers_df['session'].nunique()
 
     # Step 3: Create a clean DataFrame by excluding the outliers
     clean_df = df[~df.index.isin(outliers_df.index)]
 
     n_clean_sessions = clean_df['session'].nunique()  # Number of unique sessions in the clean data
+    print(clean_df['session'].nunique())
+    print(clean_df.shape)
+    print(outlier_n)
 
     # Optional: Save the clean DataFrame to a CSV file
     clean_df.to_csv(os.path.join(workdir,'clean_data.csv'), index=False)
@@ -445,9 +450,9 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
                 "This boxplot displays the distribution of z-scores by age group.\n"
                 "Each box represents the interquartile range, with whiskers extending\n"
                 f"to show the range within {threshold} times the IQR.\n"
-                f"Unique sessions: N = {n_sessions}, after cleaning N = {n_clean_sessions}"
+                f"Unique sessions: N = {n_sessions}."
                 # f"Number of sessions after removing outliers = {n_clean_sessions}\n"
-                f"{outlier_n} participant(s) fell outside the {threshold} IQR range and are flagged for further review.",
+                f"\n{outlier_n} session(s) fell outside the {threshold} IQR range and were flagged for further review.",
                 wrap=True, horizontalalignment='left', fontsize=12,
                 bbox={'facecolor': 'lightgray', 'alpha': 0.5, 'pad': 11})  # Added padding for better spacing
 
@@ -575,7 +580,7 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     # Add explanation text below the plot
     plt.figtext(0.15, 0.35, "This plot shows the distribution of participant ages in months.\n"
                         "The KDE curve provides a smoothed estimate of the age distribution.\n"
-                        f"Plot limits set to {age_min}-{age_max} months, n = {n}.\n"
+                        f"Plot limits set to {age_min}-{age_max} months, N = {n}.\n"
                         f"Included projects = {', '.join(project_labels)}",
                 wrap=True, horizontalalignment='left', fontsize=12,
                 bbox={'facecolor': 'lightgray', 'alpha': 0.5, 'pad': 15})  # Added padding for better spacing
@@ -624,7 +629,7 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
                             f"The smoothed trends allow for non-linear changes in TICV across age, and individual data points "
                             f"are overlaid to illustrate distribution.\n"
                             f"Data points outside the initial study {threshold} IQR range are excluded from the plot.\n\n"
-                            f"Plot limits set to {age_min}-{age_max} months, n = {n}."
+                            f"Plot limits set to {age_min}-{age_max} months, N = {n}.\n"
                             f"Included projects = {', '.join(project_labels)}",
                 wrap=True, horizontalalignment='left', fontsize=12,
                 bbox={'facecolor': 'lightgray', 'alpha': 0.5, 'pad': 15})  # Added padding for better spacing
@@ -688,7 +693,7 @@ def merge_pdfs(project_label, api_key, cover, report, final_report):
 
 
     custom_name = final_report.split('/')[-1]
-    project.upload_file(final_report, filename=custom_name)
+    project.upload_file(final_report, filename=custom_name,classification="Report")
     log.info("Report has been uploaded to the project's information tab.")
 
 
