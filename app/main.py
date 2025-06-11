@@ -12,6 +12,8 @@ import statsmodels.api as sm
 
 import textwrap
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
+
 import seaborn as sns
 import numpy as np
 import pandas as pd
@@ -21,6 +23,7 @@ from sklearn.preprocessing import SplineTransformer
 from sklearn.linear_model import LinearRegression
 
 from sklearn.pipeline import make_pipeline
+from patsy import dmatrix
 
 
 import flywheel
@@ -44,6 +47,13 @@ global labels
 global range_mapping
 global label_mapping
 global bins_mapping
+global age_min
+global age_max
+global age_range
+global threshold
+global age_unit
+global growth_curve
+global birth_weight_icv
 
 bins = [0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 18, 21, 24, 30, 36, 48, 60, 72, 84, 96, 108, 120, 144, 168, 192, 216, 252, 300]
 labels = ['0-1 month', '1-2 months', '2-3 months', '3-4 months', '4-5 months', '5-6 months',
@@ -91,22 +101,39 @@ bins_mapping = {
 
 
 # 1. Generate Cover Page
-def create_cover_page(user, input_labels, age_range, age_min, age_max, age_unit, threshold, project,output_dir):
+def create_cover_page(user, input_labels, config_context, project,output_dir):
 
     global bins 
     global labels
     global range_mapping
     global label_mapping
     global bins_mapping
+    global age_min
+    global age_max
+    global age_range
+    global threshold
+    global age_unit
+    global growth_curve
+    global birth_weight_icv
+
+
+    age_min = config_context["age_min_months"]
+    age_max = config_context["age_max_months"]
+    age_range = config_context["age_range"]
+    threshold = config_context["threshold"]
+    age_unit = config_context["age_unit"]
+    growth_curve = config_context["growth_curve"]
+    birth_weight_icv = config_context["birth_weight_icv"]
 
     if age_range != "":
+
 
         age_min = range_mapping[age_range][0] 
         age_max = range_mapping[age_range][1] 
         labels = label_mapping[age_range]
         bins = bins_mapping[age_range]
 
-    log.info(f"Age Min:  {age_min} \nAge Max: {age_max} \nAge Range: {age_range}\nAge Bins: {bins}")
+    log.info(f"Age Min: {age_min} | Age Max: {age_max} | Age Range: {age_range} | Age Bins: {bins}")
 
     filename = 'cover_page'
     cover = f"{output_dir}{filename}.pdf"
@@ -174,7 +201,7 @@ def create_cover_page(user, input_labels, age_range, age_min, age_max, age_unit,
 
 
 # 2. Parse the volumetric CSV File
-def parse_csv(filepath, project_label, age_range, age_min, age_max, age_unit, threshold):
+def parse_csv(filepath, project_label,  config_context):
 
     """Parse the input CSV file.
 
@@ -193,6 +220,13 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, age_unit, th
     global range_mapping
     global label_mapping
     global bins_mapping
+    global age_min
+    global age_max
+    global age_range
+    global threshold
+    global age_unit
+    global growth_curve
+    global birth_weight_icv
         
     # Example DataFrame with ages in months
     df = pd.read_csv(filepath) #
@@ -246,18 +280,18 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, age_unit, th
     # Calculate z-scores
     df['z_score'] = (df['total intracranial'] - df['mean_total_intracranial']) / df['std_total_intracranial']
     # Check if 'project_label' exists, if not, assign a default value
-    if 'project_label' not in df.columns:
-        df['project_label'] = project_label  # Or any default value like None
+    
+    df['project_label'] = project_label  # Or any default value like None
 
     
     # Calculate other volumes
-    df['total cerebral white matter'] = df['left cerebral white matter'] + df['right cerebral white matter']
-    df['total cerebral cortex'] = df['left cerebral cortex'] + df['right cerebral cortex']
-    df['hippocampus'] = df['left hippocampus'] + df['right hippocampus']
-    df['thalamus'] = df['left thalamus'] + df['right thalamus']
-    df['amygdala'] = df['left amygdala'] + df['right amygdala']
-    df['putamen'] = df['left putamen'] + df['right putamen']
-    df['caudate'] = df['left caudate'] + df['right caudate']
+    # df['total cerebral white matter'] = df['left cerebral white matter'] + df['right cerebral white matter']
+    # df['total cerebral cortex'] = df['left cerebral cortex'] + df['right cerebral cortex']
+    # df['hippocampus'] = df['left hippocampus'] + df['right hippocampus']
+    # df['thalamus'] = df['left thalamus'] + df['right thalamus']
+    # df['amygdala'] = df['left amygdala'] + df['right amygdala']
+    # df['putamen'] = df['left putamen'] + df['right putamen']
+    # df['caudate'] = df['left caudate'] + df['right caudate']
 
 
     used_age_groups = [age for age in labels if age in df['age_group'].unique()]
@@ -269,18 +303,18 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, age_unit, th
     
     # Define the list of columns you want to retain
     
-    volumetric_cols = ['total intracranial', 'z_score', 'total cerebral white matter', 'total cerebral cortex', 'hippocampus', 
-                   'thalamus', 'amygdala', 'putamen', 'caudate']
-    columns_to_keep = ['project_label', 'subject',	'session',	'age_in_months', 'sex',	'acquisition'] + volumetric_cols
+    # volumetric_cols = ['total intracranial', 'z_score', 'total cerebral white matter', 'total cerebral cortex', 'hippocampus', 
+    #                'thalamus', 'amygdala', 'putamen', 'caudate']
+    columns_to_keep = ['project_label', 'subject',	'session',	'age_in_months', 'sex',	'acquisition'] +  ['total intracranial'] #volumetric_cols
     
-    for col in volumetric_cols:
+    # for col in volumetric_cols:
 
-        # Calculate mean and std for each group
-        df[f'mean_{col}'] = grouped[col].transform('mean')
-        df[f'std_{col}'] = grouped[col].transform('std')
+    #     # Calculate mean and std for each group
+    #     df[f'mean_{col}'] = grouped[col].transform('mean')
+    #     df[f'std_{col}'] = grouped[col].transform('std')
 
-        # Calculate z-scores
-        df[f'z_score_{col}'] = (df[col] - df[f'mean_{col}']) / df[f'std_{col}']
+    #     # Calculate z-scores
+    #     df[f'z_score_{col}'] = (df[col] - df[f'mean_{col}']) / df[f'std_{col}']
 
         
     # Filter the DataFrame for subjects with z-scores outside of ±1.5 SD and retain only the specified columns
@@ -290,7 +324,7 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, age_unit, th
     
     # Save the filtered DataFrame to a CSV file
     outliers_df.to_csv(os.path.join(output_dir,'outliers_list.csv'), index=False)
-    print(outliers_df)
+    
     
     outlier_n = outliers_df['session'].nunique()
 
@@ -298,22 +332,36 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, age_unit, th
     clean_df = df[~df.index.isin(outliers_df.index)]
 
     n_clean_sessions = clean_df['session'].nunique()  # Number of unique sessions in the clean data
-    print(clean_df['session'].nunique())
-    print(clean_df.shape)
-    print(outlier_n)
+    #print(clean_df['session'].nunique())
+    #print(clean_df.shape)
 
     # Optional: Save the clean DataFrame to a CSV file
     clean_df.to_csv(os.path.join(workdir,'clean_data.csv'), index=False)
 
 
     # Set limit for the age range to be included in the analysis
-    upper_age_limit = age_max
-    lower_age_limit = age_min  
+    upper_age_limit = int(age_max)
+    lower_age_limit = int(age_min) 
 
     # Filter the data to include only observations up to the requested limit
     filtered_df = clean_df[(clean_df['age_in_months'] <= upper_age_limit) & (clean_df['age_in_months'] >= lower_age_limit)]
 
     n = len(filtered_df)  # Number of observations in the filtered data
+    print("@@@@ Number of observations in the filtered data:", n)
+    if n == 0:
+        log.warning("No data available after filtering. Please check the age range and input data.")
+        #use the max and min of age_in_months instead 
+        filtered_df = clean_df
+        upper_age_limit = int(clean_df['age_in_months'].max())
+        lower_age_limit = int(clean_df['age_in_months'].min())
+
+        #update the new values
+        age_max = upper_age_limit
+        age_min = lower_age_limit
+
+        n = len(filtered_df)  # Recalculate number of observations in the filtered data
+    
+
     n_projects = filtered_df['project_label'].nunique()  # Number of unique projects in the filtered data
     project_labels = filtered_df['project_label'].unique()  # Unique project labels in the filtered data
 
@@ -365,38 +413,51 @@ def parse_csv(filepath, project_label, age_range, age_min, age_max, age_unit, th
     plt.savefig(os.path.join(workdir, "outlier_icv_plot.png"))
 
     # Count missing values
-    missing_counts = df[["age_in_months", "sex"]].isna().sum()
+    #missing_counts = df[["age_in_months", "sex"]].isna().sum()
     
     # Plot
-    plt.figure(figsize=(6, 4))
-    missing_counts.plot(kind="bar", color="#D96B6B", linewidth=1)
+    # plt.figure(figsize=(6, 4))
+    # missing_counts.plot(kind="bar", color="#D96B6B", linewidth=1)
 
-    # Styling
-    plt.ylabel("Number of observations")
-    plt.title("Missing metadata")
-    plt.xticks(rotation=0)  # Keep labels horizontal
+    # # Styling
+    # plt.ylabel("Number of observations")
+    # plt.title("Missing metadata")
+    # plt.xticks(rotation=0)  # Keep labels horizontal
 
-    # Add explanation text below the plot
-    plt.figtext(0.13, 0.28, 
-                "Missing sex and age information affects the usability of this report.\n"
-                "Please ensure the metadata is available in your project.\nn"
-               )  # Added padding for better spacing
+    # # Add explanation text below the plot
+    # plt.figtext(0.13, 0.28, 
+    #             "Missing sex and age information affects the usability of this report.\n"
+    #             "Please ensure the metadata is available in your project.\nn"
+    #            )  # Added padding for better spacing
 
 
-    plt.savefig(os.path.join(output_dir, "missing_metadata.png"))
+    # plt.savefig(os.path.join(output_dir, "missing_metadata.png"))
 
 
     return df, summary_table, filtered_df, n, n_projects, n_sessions, n_clean_sessions, outlier_n, project_labels, labels
 
 
 # 3. Generate the Data Report
-def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions, n_clean_sessions, outlier_n, project_labels, labels, age_range, age_min, age_max, age_unit, threshold,output_dir,api_key):
+def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions, n_clean_sessions, outlier_n, project_labels, config_context,output_dir,api_key):
 
     """Generate a data report with multiple plots and a summary table in a PDF format.
 
     Returns: report filename
         
     """
+
+    global bins 
+    global labels
+    global range_mapping
+    global label_mapping
+    global bins_mapping
+    global age_min
+    global age_max
+    global age_range
+    global threshold
+    global age_unit
+    global growth_curve
+    global birth_weight_icv
 
     filename = "data_report"
     report = f'{workdir}{filename}.pdf'
@@ -475,9 +536,6 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     prev_age_group = None
     for idx, row in summary_table.iterrows():
         current_age_group = row['Age Group']
-        
-
-
         for sex in sexes:
             
             if current_age_group == prev_age_group:
@@ -501,12 +559,21 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     # Create a new long-format DataFrame
     long_summary_table = pd.DataFrame(long_rows)
 
+    nsub_cols = [col for col in long_summary_table.columns if col.lower().startswith('n sub')]
+
+
+
+    # Drop rows where any of those columns == 0
+    long_summary_table = long_summary_table[~(long_summary_table[nsub_cols] == "0").any(axis=1)]
+
     ######
 
     fig = plt.figure(figsize=(9, 5))  # smaller now!
     ax = fig.add_axes([0.05, 0.3, 0.9, 0.6])
     ax.axis('tight')
     ax.axis('off')
+
+
 
     #long_summary_table = summary_table
     table = ax.table(
@@ -536,7 +603,7 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
 
     # Add title and footnote
     #ax.set_title('Summary Descriptive Statistics', fontdict={'fontsize': 13, 'weight': 'bold'})
-    fig.suptitle('Summary Descriptive Statistics', fontsize=13, fontweight='bold')
+    #fig.suptitle('Summary Descriptive Statistics', fontsize=13, fontweight='bold')
 
     plt.tight_layout()
     table_plot_path = os.path.join(workdir, "descriptive_stats_long.png")
@@ -571,7 +638,7 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     ax = fig.add_axes([0.125, 0.5, 0.8, 0.4])  # Left, bottom, width, height (adjust these as needed)
 
     # fig, ax = plt.subplots(figsize=a4_fig_size)
-    sns.histplot(filtered_df['age_in_months'], bins=20, kde=True, ax=ax)
+    sns.histplot(filtered_df['age'], bins=20, kde=True, ax=ax)
     ax.set_title('Distribution of Age in Months')
     ax.set_xlabel('Age (months)')
     ax.set_ylabel('Frequency')
@@ -597,6 +664,8 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     fig = plt.figure(figsize=a4_fig_size)
     ax = fig.add_axes([0.125, 0.5, 0.8, 0.4])  # Left, bottom, width, height (adjust these as needed)
     ax.grid(True)
+
+    print(filtered_df['sex'].value_counts())
 
     for sex in filtered_df['sex'].unique():
         df_sex = filtered_df[filtered_df['sex'] == sex]
@@ -642,8 +711,8 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     plt.close()
 
 
-    volumetrics_to_plot = ['total cerebral white matter', 'total cerebral cortex', 'hippocampus', 
-                   'thalamus', 'amygdala', 'putamen', 'caudate']
+    # volumetrics_to_plot = ['total cerebral white matter', 'total cerebral cortex', 'hippocampus', 
+    #                'thalamus', 'amygdala', 'putamen', 'caudate']
 
     
     scaled_width1, scaled_height1 = scale_image(age_plot_path, 500, 500)
@@ -661,11 +730,106 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
 
     pdf = beautify_report(pdf,False,True)
     pdf.showPage()    
-    pdf.save()  # Save the PDF
+    
 
+   
+
+    # --- Plot 5: Growth curves--- #
+
+    if growth_curve:
+
+        var = 'birth weight kg'
+        var2 = 'total intracranial'
+
+        # Define birth weight bins and labels
+        bw_bins = [0, 2.5, 3.5, df[var].max()]
+        bw_labels = ['Low (<2.5 kg)', 'Normal (2.5–3.5 kg)', 'High (>3.5 kg)']
+
+        # Assign birth weight groups
+        df['bw_group'] = pd.cut(df[var], bins=bw_bins, labels=bw_labels)
+
+        palette = sns.color_palette("Set2")
+
+        # Prepare legend elements
+        bin_legend_elements = [Patch(facecolor=col, label=label) for col, label in zip(palette, bw_labels)]
+        scatter_legend_elements = []
+
+        # Initialize the plot
+        plt.figure(figsize=(10, 6))
+        sns.lineplot(data=df, x='age', y=var2, hue='bw_group', estimator=None, units='subject', lw=1, alpha=0.1)
+
+        # Fit spline and scatter per group
+        for i, group in enumerate(bw_labels):
+            sub_df = df[df['bw_group'] == group].dropna(subset=["age", var2])
+            if len(sub_df) < 5:
+                print(f"Skipping group '{group}' due to insufficient data ({len(sub_df)} rows).")
+                continue
+
+            try:
+                color = palette[i]
+                n_samples = len(sub_df)
+
+                # Plot scatter
+                plt.scatter(sub_df["age"], sub_df[var2], color=color, alpha=0.05)
+                
+
+                # Add visible patch for legend
+                scatter_legend_elements.append(
+                    Patch(facecolor=color, edgecolor='black', label=f"{group} (n={n_samples})", alpha=0.8)
+                )
+
+                # Fit and plot spline
+                x = dmatrix("bs(age, df=4)", {"age": sub_df["age"]}, return_type='dataframe')
+                model = sm.OLS(sub_df[var2], x).fit()
+                pred_x = np.linspace(sub_df["age"].min(), sub_df["age"].max(), 100)
+                pred_x_spline = dmatrix("bs(age, df=4)", {"age": pred_x}, return_type='dataframe')
+
+                plt.plot(pred_x, model.predict(pred_x_spline), linewidth=2, linestyle='--', color=color)
+
+            except Exception as e:
+                print(f"Error fitting spline for group '{group}': {e}")
+
+        # Combine legend entries (scatter with n + bin info)
+        fig = plt.gcf()
+        combined_legend = scatter_legend_elements 
+        fig.legend(
+            handles=combined_legend,
+            title="Birth Weight Groups",
+            loc="center right",
+            bbox_to_anchor=(1.25, 0.5),
+            borderaxespad=0.0,
+            frameon=True
+        )
+
+        plt.gca().get_legend().remove()
+
+
+        # Final plot labels
+        plt.title("ICV Growth by Birth Weight Group")
+        plt.xlabel("Age (Months)")
+        plt.ylabel(var2.title())
+        #plt.tight_layout()
+
+        growth_plot_path = os.path.join(workdir, "birthWeight_icv_growthCurve.png")
+        plt.savefig(growth_plot_path,bbox_inches='tight')
+
+
+
+        scaled_width1, scaled_height1 = scale_image(growth_plot_path, 500, 500)
+    
+        plot1_x = (page_width - scaled_width1) / 2  # Centered horizontally
+        plot1_y = page_height - scaled_height1 - 50 #- 50
+
+
+        pdf.drawImage(growth_plot_path, plot1_x, plot1_y, width=scaled_width1, height=scaled_height1)   # Position plot higher on the page    
+
+        pdf = beautify_report(pdf,False,True)
+        pdf.showPage()    
+    
+
+    pdf.save()  # Save the PDF
     print("PDF summary report has been generated.")
     return report
-
 
 # 5. Merge the Cover Page and Data Report
 def merge_pdfs(project_label, api_key, cover, report, final_report):

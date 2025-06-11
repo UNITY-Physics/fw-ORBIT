@@ -19,14 +19,14 @@
       "default": "",
       "description": "Choose an age range to include in the report."
     },
-    "age_min": {
+    "age_min_months": {
       "default": 1,
       "description": "Minimum age band to be included in the report (months)",
       "maximum": 300,
       "minimum": 0,
       "type": "integer"
     },
-    "age_max": {
+    "age_max_months": {
       "default": 3,
       "description": "Maximum age band to be included in the report (months)",
       "maximum": 300,
@@ -49,6 +49,16 @@
         "months",
         "years"
       ]
+    },
+    "growth_curve": {
+      "default": false,
+      "description": "Modelling of weight and length growth curves. Only select this if you uploaded the corresponding data.",
+      "type": "boolean"
+    },
+    "birth_weight_icv": {
+      "default": false,
+      "description": "Plotting of birth weight category by ICV. Only select this if you uploaded the corresponding data.",
+      "type": "boolean"
     }
   },
   "custom": {
@@ -75,7 +85,7 @@
     },
     "gear-builder": {
       "category": "analysis",
-      "image": "flywheel/volumetrics:0.0.16"
+      "image": "flywheel/volumetrics:0.0.22"
     },
     "kcl-app-binary": "app/main.py",
     "kcl-app-modalities": [
@@ -139,9 +149,9 @@
   },
   "label": "VoluMetrics",
   "license": "MIT",
-  "maintainer": "Niall Bourke <niall.bourke@kcl.ac.uk>",
+  "maintainer": "Hajer Karoui <hajer.karoui@kcl.ac.uk> ",
   "name": "volumetrics",
   "source": "",
   "url": "",
-  "version": "0.0.16"
+  "version": "0.0.22"
 }
