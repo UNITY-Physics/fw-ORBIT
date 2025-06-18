@@ -401,7 +401,7 @@ def parse_csv(filepath, project_label,  config_context):
 
     # Round the numerical columns to 2 decimal places
     summary_table = summary_table.round(2)
-    summary_table.to_csv(os.path.join(workdir,'summary_table.csv'),index=False)
+    summary_table.to_csv(os.path.join(output_dir,'summary_table.csv'),index=False)
 
 
     #### Plotting outliers #####
@@ -609,25 +609,6 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     table_plot_path = os.path.join(workdir, "descriptive_stats_long.png")
     plt.savefig(table_plot_path, bbox_inches='tight')
 
-
-
-    padding = 60  # Space between plots
-
-    scaled_width1, scaled_height1 = scale_image(zscore_plot_path, 500, 500)
-    
-    plot1_x = (page_width - scaled_width1) / 2  # Centered horizontally
-    plot1_y = page_height - scaled_height1 - padding #- 50
-
-    scaled_width2, scaled_height2 = scale_image(table_plot_path, 500, 400)
-    plot2_x = (page_width - scaled_width2) / 2  # Centered horizontally
-    plot2_y = plot1_y - scaled_height2 + 100  #- plot1_y - padding 
-
-    pdf.drawImage(zscore_plot_path, plot1_x, plot1_y, width= scaled_width1, height=scaled_height1)
-    pdf.drawImage(table_plot_path, plot2_x, plot2_y, width= scaled_width2, height=scaled_height2)   # Position plot higher on the page
-    
-    pdf = beautify_report(pdf,False,True)
-    pdf.showPage()
-
     # --- Plot 3: Histogram of Z-Scores --- #
     
     # Create figure with full A4 size using plt.figure() (not plt.subplots)
@@ -658,6 +639,29 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     #plt.tight_layout()
     plt.savefig(age_plot_path)
     plt.close()
+
+    padding = 60  # Space between plots
+
+    scaled_width1, scaled_height1 = scale_image(zscore_plot_path, 500, 500)
+    
+    plot1_x = (page_width - scaled_width1) / 2  # Centered horizontally
+    plot1_y = page_height - scaled_height1 - padding #- 50
+
+    #NO longer drawing the summary table. This will be output as a csv
+    #Age distribution plot
+    scaled_width2, scaled_height2 = scale_image(age_plot_path, 500, 500)
+    plot2_x = (page_width - scaled_width2) / 2  # Centered horizontally
+    plot2_y = plot1_y - scaled_height2 + 100  #- plot1_y - padding 
+
+
+    
+    pdf.drawImage(zscore_plot_path, plot1_x, plot1_y, width= scaled_width1, height=scaled_height1)
+    pdf.drawImage(age_plot_path, plot2_x, plot2_y, width= scaled_width2, height=scaled_height2)   # Position plot higher on the page
+    
+    pdf = beautify_report(pdf,False,True)
+    pdf.showPage()
+
+    
 
     # --- Plot 4: Polynomial fit with degree 3 (cubic) using sns.regplot --- #
     # Create figure with full A4 size using plt.figure() (not plt.subplots)
@@ -715,7 +719,7 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     #                'thalamus', 'amygdala', 'putamen', 'caudate']
 
     
-    scaled_width1, scaled_height1 = scale_image(age_plot_path, 500, 500)
+    scaled_width1, scaled_height1 = scale_image(scatter_plot_path, 500, 500)
     
     plot1_x = (page_width - scaled_width1) / 2  # Centered horizontally
     plot1_y = page_height - scaled_height1 - 50 #- 50
@@ -725,14 +729,12 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     plot2_y = plot1_y - (scaled_height2 / 2) - 100 #- plot1_y - padding 
 
 
-    pdf.drawImage(age_plot_path, plot1_x, plot1_y, width=scaled_width1, height=scaled_height1)   # Position plot higher on the page    
-    pdf.drawImage(scatter_plot_path, plot2_x, plot2_y, width= scaled_width2, height=scaled_height2)   # Position plot higher on the page    
+    pdf.drawImage(scatter_plot_path, plot1_x, plot1_y, width=scaled_width1, height=scaled_height1)   # Position plot higher on the page    
+    #pdf.drawImage(scatter_plot_path, plot2_x, plot2_y, width= scaled_width2, height=scaled_height2)   # Position plot higher on the page    
 
     pdf = beautify_report(pdf,False,True)
     pdf.showPage()    
     
-
-   
 
     # --- Plot 5: Growth curves--- #
 
