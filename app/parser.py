@@ -177,13 +177,13 @@ def impute_information(context,vols):
     futures = []
     
     #minimorph's output is dicom_age_in_months
-    for age_column in ['dicom_age_in_months', 'template_age']:
-        if age_column in df.columns:
-            log.info(f"Extracting age from {age_column} column")
-            # Step 1: Apply regex to extract digits
-            df['age'] = df[age_column].str.replace(r'[a-zA-Z]', '', regex=True)
-            # Step 2: Convert to numeric (this will turn non-convertible entries to NaN)
-            df['age'] = pd.to_numeric(df[age_column], errors='coerce')
+    # for age_column in ['dicom_age_in_months', 'template_age']:
+    #     if age_column in df.columns:
+    #         log.info(f"Extracting age from {age_column} column")
+    #         # Step 1: Apply regex to extract digits
+    #         df['age'] = df[age_column].str.replace(r'[a-zA-Z]', '', regex=True)
+    #         # Step 2: Convert to numeric (this will turn non-convertible entries to NaN)
+    #         df['age'] = pd.to_numeric(df[age_column], errors='coerce')
 
         
     df.loc[df['age'] < 0, 'age'] = pd.NA #some sites fill in age_at_scan with one month before DOB
