@@ -335,7 +335,16 @@ def parse_csv(filepath, outlier_thresholds, volumetric_columns, project_label,  
     outliers_df.to_csv(os.path.join(output_dir,'outliers_list.csv'), index=False)
 
 
+
+
     outlier_n = outliers_df['session'].nunique()
+
+
+    outliers_per_region = {}
+    for region, threshold in outlier_thresholds.items():
+        outliers_per_region[region] = len(outliers_df[outliers_df[region].abs() > threshold])
+    outliers_per_region = pd.DataFrame.from_dict(outliers_per_region, orient='index')
+
 
     # Step 3: Create a clean DataFrame by excluding the outliers
     clean_df = df[df['is_outlier'] == False]
@@ -445,11 +454,11 @@ def parse_csv(filepath, outlier_thresholds, volumetric_columns, project_label,  
     # plt.savefig(os.path.join(output_dir, "missing_metadata.png"))
 
 
-    return df, summary_table, filtered_df, n, n_projects, n_sessions, n_clean_sessions, outlier_n, project_labels, labels
+    return df, summary_table, filtered_df, n, n_projects, n_sessions, n_clean_sessions, outlier_n, outliers_per_region, project_labels, labels
 
 
 # 3. Generate the Data Report
-def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions, n_clean_sessions, outlier_n, project_labels, config_context,output_dir,api_key):
+def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions, n_clean_sessions, outlier_n, outliers_per_region, project_labels, config_context,output_dir,api_key):
 
     """Generate a data report with multiple plots and a summary table in a PDF format.
 
@@ -507,24 +516,34 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
 
     # Set the plot size and create the boxplot
     # fig, ax = plt.subplots(figsize=a4_fig_size)
-    sns.boxplot(x='age_group', y='z_score', data=df, ax=ax, order=used_age_groups, palette='Set2', legend=False, hue='age_group')
-    ax.set_title('Z-Scores by Age Group')
-    ax.set_xlabel('Age Group')
-    ax.set_ylabel('Z-Score')
+    # sns.boxplot(x='age_group', y='z_score', data=df, ax=ax, order=used_age_groups, palette='Set2', legend=False, hue='age_group')
+    # ax.set_title('Z-Scores by Age Group')
+    # ax.set_xlabel('Age Group')
+    # ax.set_ylabel('Z-Score')
     
-    # Set x-axis tick labels to show the age group labels in the correct order
-    ax.set_xticklabels(age_group_labels, rotation=45)
+    # # Set x-axis tick labels to show the age group labels in the correct order
+    # ax.set_xticklabels(age_group_labels, rotation=45)
+    # plt.setp(ax.get_xticklabels(), rotation=45, fontsize=10)  # Shift labels slightly to the left
+    # ax.grid(True)
+
+    outliers_per_region[0].plot(kind='bar')
+    ax.set_xlabel('Region')
+    ax.set_ylabel('Number of Outliers')
+    ax.set_title('Number of Outliers per Region')
+    ax.set_xticklabels(rotation=45)
     plt.setp(ax.get_xticklabels(), rotation=45, fontsize=10)  # Shift labels slightly to the left
-    ax.grid(True)
+
+    plt.show()
+
 
     # Add explanation text below the plot
     plt.figtext(0.08, 0.30, 
-                "This boxplot displays the distribution of z-scores by age group.\n"
-                "Each box represents the interquartile range, with whiskers extending\n"
-                f"to show the range within {threshold} times the IQR.\n"
+                "This boxplot displays how many outliers were flagged per region.\n"
+                "Each bin represent how many values were above or below the \n"
+                f"threshold for that region when transformed using the covariance approach\n"
                 f"Unique sessions: N = {n_sessions}."
                 # f"Number of sessions after removing outliers = {n_clean_sessions}\n"
-                f"\n{outlier_n} session(s) fell outside the {threshold} IQR range and were flagged for further review.",
+                f"\n{outlier_n} session(s) fell outside the thresholds and were flagged for further review.",
                 wrap=True, horizontalalignment='left', fontsize=12,
                 bbox={'facecolor': 'lightgray', 'alpha': 0.5, 'pad': 11})  # Added padding for better spacing
 

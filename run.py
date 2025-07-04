@@ -36,10 +36,10 @@ def main(context: GearToolkitContext) -> None:
     project_label = project.label
     print(filepath)
     # Step 2: Parse the CSV file
-    df, summary_table, filtered_df, n, n_projects, n_sessions, n_clean_sessions, outlier_n, project_labels, labels = parse_csv(filepath, outlier_thresholds, volumetric_columns, project_label, config_context)
+    df, summary_table, filtered_df, n, n_projects, n_sessions, n_clean_sessions, outlier_n, outliers_per_region, project_labels, labels = parse_csv(filepath, outlier_thresholds, volumetric_columns, project_label, config_context)
 
     # Step 3: Create the data report using the parsed CSV, and the QC csv    
-    report = create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions, n_clean_sessions,  outlier_n, project_labels, config_context,output_dir, api_key)
+    report = create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions, n_clean_sessions,  outlier_n, outliers_per_region, project_labels, config_context,output_dir, api_key)
     # qc = generate_qc_report(directory_path, input_labels, output_dir,project_labels)
     # Step 4: Merge cover page and data report
     # Get the current timestamp
