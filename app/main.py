@@ -8,6 +8,7 @@ from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, Frame,SimpleDocTemplate, Table, TableStyle, PageBreak, Spacer,  PageTemplate, Frame
 from reportlab.lib.utils import ImageReader
+import yaml
 import statsmodels.api as sm
 
 import textwrap
@@ -34,6 +35,7 @@ import logging
 
 
 from utils.format import beautify_report, scale_image, simplify_label, generate_on_page
+from utils.outliers import outlier_detection
 
 output_dir ='/flywheel/v0/output/'
 workdir = '/flywheel/v0/work/'
@@ -201,7 +203,7 @@ def create_cover_page(user, input_labels, config_context, project,output_dir):
 
 
 # 2. Parse the volumetric CSV File
-def parse_csv(filepath, project_label,  config_context):
+def parse_csv(filepath, outlier_thresholds, volumetric_columns, project_label,  config_context):
 
     """Parse the input CSV file.
 
@@ -302,34 +304,43 @@ def parse_csv(filepath, project_label,  config_context):
     df['age_group'] = pd.Categorical(df['age_group'], categories=used_age_groups, ordered=True)
     
     # Define the list of columns you want to retain
+
+
     
-    # volumetric_cols = ['total intracranial', 'z_score', 'total cerebral white matter', 'total cerebral cortex', 'hippocampus', 
-    #                'thalamus', 'amygdala', 'putamen', 'caudate']
-    columns_to_keep = ['project_label', 'subject',	'session',	'age_in_months', 'sex',	'acquisition'] +  ['total intracranial'] #volumetric_cols
+    # volumetric_cols = [ 'supratentorial_tissue',
+    #    'supratentorial_csf', 'ventricles', 'cerebellum', 'cerebellum_csf',
+    #    'brainstem', 'brainstem_csf', 'left_thalamus', 'left_caudate',
+    #    'left_putamen', 'left_globus_pallidus', 'right_thalamus',
+    #    'right_caudate', 'right_putamen', 'right_globus_pallidus',
+    #    'posterior_callosum', 'mid_posterior_callosum', 'central_callosum',
+    #    'mid_anterior_callosum', 'anterior_callosum', 'icv']
+
+    # Define the columns to keep in the DataFrame
+
+    columns_to_keep = ['project_label', 'subject',	'session',	'age_in_months', 'sex',	'acquisition',"age_group", "z_score"]  + volumetric_columns
+
+    # Define thresholds for outlier detection
+
+
     
+    # # define z-score thresholds 
+    # zscore_thresholds  = {}
     # for col in volumetric_cols:
+    #     zscore_thresholds[col] = 2  # Set a z-score threshold of 2 for all volumetric columns
 
-    #     # Calculate mean and std for each group
-    #     df[f'mean_{col}'] = grouped[col].transform('mean')
-    #     df[f'std_{col}'] = grouped[col].transform('std')
+    # Retrieve outliers using the outlier_detection function
+    df, outliers_df = outlier_detection(df[columns_to_keep], age_column = 'age_in_months',volumetric_columns=volumetric_columns, cov_thresholds = outlier_thresholds, zscore_thresholds = outlier_thresholds)
 
-    #     # Calculate z-scores
-    #     df[f'z_score_{col}'] = (df[col] - df[f'mean_{col}']) / df[f'std_{col}']
-
-        
-    # Filter the DataFrame for subjects with z-scores outside of ±1.5 SD and retain only the specified columns
-    outliers_df = df[(df['z_score'] < - threshold) | (df['z_score'] > threshold)][columns_to_keep]
-    df["is_outlier"] = (df['z_score'] < -threshold) | (df['z_score'] > threshold)
-
-    
     # Save the filtered DataFrame to a CSV file
     outliers_df.to_csv(os.path.join(output_dir,'outliers_list.csv'), index=False)
-    
-    
+
+
     outlier_n = outliers_df['session'].nunique()
 
     # Step 3: Create a clean DataFrame by excluding the outliers
-    clean_df = df[~df.index.isin(outliers_df.index)]
+    clean_df = df[df['is_outlier'] == False]
+    clean_df.drop(columns = ['is_outlier'], inplace=True)
+
 
     n_clean_sessions = clean_df['session'].nunique()  # Number of unique sessions in the clean data
     #print(clean_df['session'].nunique())
@@ -782,7 +793,8 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
 
                 # Fit and plot spline
                 x = dmatrix("bs(age, df=4)", {"age": sub_df["age"]}, return_type='dataframe')
-                model = sm.OLS(sub_df[var2], x).fit()
+                model = LinearRegression().fit(x, sub_df[var2])
+                #model = sm.OLS(sub_df[var2], x).fit()
                 pred_x = np.linspace(sub_df["age"].min(), sub_df["age"].max(), 100)
                 pred_x_spline = dmatrix("bs(age, df=4)", {"age": pred_x}, return_type='dataframe')
 
