@@ -29,6 +29,7 @@ reportlab
 requests
 rfc3987
 rpds-py
+scipy
 seaborn
 statsmodels
 six
@@ -37,3 +38,4 @@ tzdata
 tzlocal
 urllib3
 scikit-learn
+PyYAML

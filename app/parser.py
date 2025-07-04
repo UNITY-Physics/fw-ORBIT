@@ -11,6 +11,8 @@ import logging
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import yaml
+
 
 log = logging.getLogger(__name__)
 
@@ -88,12 +90,12 @@ def parse_config(context):
     log.info(f"Input files found: {input_labels}")
 
     df_path = impute_information(context,input_labels['volumetric'])
-    df_path = rename_columns (input_labels['volumetric'])
+    df_path, outlier_thresholds, volumetric_columns = rename_columns (input_labels['volumetric'])
     df_path = os.path.join(work_path,filename)
     
     config_context = {"age_min_months": age_min, "age_max_months": age_max, "age_range": age_range,"age_unit": age_unit, "threshold": threshold, "growth_curve": growth_curve, "birth_weight_icv": birth_weight_icv}
     
-    return user, df_path, input_labels, config_context, project_container, api_key
+    return user, df_path, input_labels,outlier_thresholds, volumetric_columns, config_context, project_container, api_key
 
 def impute_row(index, row, project, columns, log):
     subject_label = row['subject']
@@ -256,12 +258,44 @@ def rename_columns (vols):
 
 
     for keyword, key in name_key_maping.items():
+
         if keyword in vols:
+
+
+
+            # FIX: Uncomment when yml in thresholds is available
+
+            # with open('/flywheel/v0/utils/thresholds.yml', 'r') as f:
+            #     threshold_dictionary = yaml.load(f, Loader=yaml.SafeLoader)
+            #     outlier_thresholds = threshold_dictionary[keyword]
+            #     volumetric_cols = threshold_dictionary[keyword+ '_volumetric_columns']["volumetric_columns"]
+ 
+ 
             column_mapping = name_key_maping[keyword]
             df.rename(columns=column_mapping,inplace=True)
 
             log.info('Column has been renamed')
-        
+    
+    # REMOVE BELOW WHEN YML IS AVAILABLE
+
+    outlier_thresholds = {
+            'right thalamus': 1.5,
+            'left thalamus': 1.5,
+            'right caudate': 1.5,
+            'left caudate': 1.5,
+            'right putamen': 1.5,
+            'left putamen': 1.5}
+    
+    volumetric_cols =  [
+        "total intracranial",
+        "right thalamus",
+        "left thalamus",
+        "right caudate",
+        "left caudate",
+        "right putamen",
+        "left putamen"]
+    
+    # END REMOVE
 
     df.columns = df.columns.str.replace('_', ' ').str.replace('-', ' ').str.lower()
     df_path = os.path.join(work_path,vols)
@@ -272,5 +306,5 @@ def rename_columns (vols):
     #df.to_csv(os.path.join(input_path,"updated_headers_.csv"),index=False)
 
     log.info("File saved..." + df_path)
-    return df_path
+    return df_path, outlier_thresholds, volumetric_cols
 
