@@ -12,6 +12,7 @@ __pycache__
 config.json
 license.txt
 interactive-run.py
+interactive-run.sh
 
 # large project files
 app/templates
