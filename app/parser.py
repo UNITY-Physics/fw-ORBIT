@@ -260,15 +260,12 @@ def rename_columns (vols):
     for keyword, key in name_key_maping.items():
 
         if keyword in vols:
+            # FIX: Un/comment when yml in thresholds is available
 
-
-
-            # FIX: Uncomment when yml in thresholds is available
-
-            # with open('/flywheel/v0/utils/thresholds.yml', 'r') as f:
-            #     threshold_dictionary = yaml.load(f, Loader=yaml.SafeLoader)
-            #     outlier_thresholds = threshold_dictionary[keyword]
-            #     volumetric_cols = threshold_dictionary[keyword+ '_volumetric_columns']["volumetric_columns"]
+            with open('/flywheel/v0/utils/thresholds.yml', 'r') as f:
+                threshold_dictionary = yaml.load(f, Loader=yaml.SafeLoader)
+                outlier_thresholds = threshold_dictionary[keyword]
+                volumetric_cols = threshold_dictionary[keyword+ '_volumetric_columns']["volumetric_columns"]
  
  
             column_mapping = name_key_maping[keyword]
@@ -278,22 +275,22 @@ def rename_columns (vols):
     
     # REMOVE BELOW WHEN YML IS AVAILABLE
 
-    outlier_thresholds = {
-            'right thalamus': 1.5,
-            'left thalamus': 1.5,
-            'right caudate': 1.5,
-            'left caudate': 1.5,
-            'right putamen': 1.5,
-            'left putamen': 1.5}
+    # outlier_thresholds = {
+    #         'right thalamus': 1.5,
+    #         'left thalamus': 1.5,
+    #         'right caudate': 1.5,
+    #         'left caudate': 1.5,
+    #         'right putamen': 1.5,
+    #         'left putamen': 1.5}
     
-    volumetric_cols =  [
-        "total intracranial",
-        "right thalamus",
-        "left thalamus",
-        "right caudate",
-        "left caudate",
-        "right putamen",
-        "left putamen"]
+    # volumetric_cols =  [
+    #     "total intracranial",
+    #     "right thalamus",
+    #     "left thalamus",
+    #     "right caudate",
+    #     "left caudate",
+    #     "right putamen",
+    #     "left putamen"]
     
     # END REMOVE
 

@@ -26,7 +26,8 @@ minimorph_volumetric_columns : {"volumetric_columns": [
     "right caudate",
     "left caudate",
     "right putamen",
-    "left putamen"]}
+    "left putamen",
+    "total intracranial"]}
 
 recon-all_volumetric_columns : {"volumetric_columns": [
     "right thalamus",
@@ -34,4 +35,5 @@ recon-all_volumetric_columns : {"volumetric_columns": [
     "right caudate",
     "left caudate",
     "right putamen",
-    "left putamen"]}
+    "left putamen",
+    "total intracranial"]}

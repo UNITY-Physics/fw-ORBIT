@@ -31,7 +31,7 @@ rfc3987
 rpds-py
 scipy
 seaborn
-statsmodels
+#statsmodels
 six
 typing-extensions
 tzdata

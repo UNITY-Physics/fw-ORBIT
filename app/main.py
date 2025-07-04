@@ -9,7 +9,7 @@ from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, Frame,SimpleDocTemplate, Table, TableStyle, PageBreak, Spacer,  PageTemplate, Frame
 from reportlab.lib.utils import ImageReader
 import yaml
-import statsmodels.api as sm
+#import statsmodels.api as sm
 
 import textwrap
 import matplotlib.pyplot as plt
@@ -538,7 +538,7 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
 
   
     # --- Plot 2: Summary Table of all Participants --- # 
-    summary_table = pd.read_csv(os.path.join(workdir,'summary_table.csv'))    
+    summary_table = pd.read_csv(os.path.join(output_dir,'summary_table.csv'))    
     summary_table.fillna(0,inplace=True)
 
     sexes = ["F","M","N/A"]
@@ -630,7 +630,7 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     ax = fig.add_axes([0.125, 0.5, 0.8, 0.4])  # Left, bottom, width, height (adjust these as needed)
 
     # fig, ax = plt.subplots(figsize=a4_fig_size)
-    sns.histplot(filtered_df['age'], bins=20, kde=True, ax=ax)
+    sns.histplot(filtered_df['age_in_months'], bins=20, kde=True, ax=ax)
     ax.set_title('Distribution of Age in Months')
     ax.set_xlabel('Age (months)')
     ax.set_ylabel('Frequency')
@@ -688,7 +688,7 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
             print(f"Skipping {sex}: only {df_sex.shape[0]} samples")
             continue
 
-        X = df_sex[['age']].values
+        X = df_sex[['age_in_months']].values
         y = df_sex['total intracranial'].values
 
         model = make_pipeline(
@@ -769,7 +769,7 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
 
         # Initialize the plot
         plt.figure(figsize=(10, 6))
-        sns.lineplot(data=df, x='age', y=var2, hue='bw_group', estimator=None, units='subject', lw=1, alpha=0.1)
+        sns.lineplot(data=df, x='age_in_months', y=var2, hue='bw_group', estimator=None, units='subject', lw=1, alpha=0.1)
 
         # Fit spline and scatter per group
         for i, group in enumerate(bw_labels):
