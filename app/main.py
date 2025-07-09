@@ -5,10 +5,12 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
+from reportlab.lib.enums import TA_JUSTIFY
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, Frame,SimpleDocTemplate, Table, TableStyle, PageBreak, Spacer,  PageTemplate, Frame
 from reportlab.lib.utils import ImageReader
 import yaml
+from reportlab.platypus import Image
 #import statsmodels.api as sm
 
 import textwrap
@@ -22,6 +24,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 from scipy.interpolate import CubicSpline
 from sklearn.preprocessing import SplineTransformer
 from sklearn.linear_model import LinearRegression
+from sklearn.mixture import GaussianMixture
+from sklearn.preprocessing import PolynomialFeatures
 
 from sklearn.pipeline import make_pipeline
 from patsy import dmatrix
@@ -34,13 +38,36 @@ import warnings
 import logging
 
 
-from utils.format import beautify_report, scale_image, simplify_label, generate_on_page
+from utils.format import beautify_report, scale_image, simplify_label, generate_on_page, generate_end_page
 from utils.outliers import outlier_detection
 
 output_dir ='/flywheel/v0/output/'
 workdir = '/flywheel/v0/work/'
 
 log = logging.getLogger(__name__)
+
+# Styles
+styles = getSampleStyleSheet()
+styleN = styles['Normal']
+styleN.alignment = TA_JUSTIFY
+styleN.fontSize = 12  # override fontsize because default stylesheet is too small
+styleN.leading = 15
+# Add left and right indentation
+styleN.leftIndent = 20  # Set left indentation
+styleN.rightIndent = 20  # Set right indentation
+
+styles.add(ParagraphStyle('Cover', parent=styles['Normal'], fontSize=10, leading=18, spaceAfter=20))
+
+# Create a custom style
+custom_style = ParagraphStyle(name="CustomStyle", parent=styleN,
+                            fontSize=12,
+                            leading=15,
+                            alignment=0,  # Centered
+                            leftIndent=20,
+                            rightIndent=20,
+                            spaceBefore=10,
+                            spaceAfter=10)
+
 
 # Define the bins and labels
 # These have been setup with finer granularity early on due to rapid growth and then coarser granularity later
@@ -140,63 +167,47 @@ def create_cover_page(user, input_labels, config_context, project,output_dir):
     filename = 'cover_page'
     cover = f"{output_dir}{filename}.pdf"
 
+
     # Ensure the directory exists
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    # Create a new PDF canvas
-    doc = SimpleDocTemplate(os.path.join(output_dir, f"{filename}.pdf"), pagesize=A4)
+    doc = SimpleDocTemplate(cover, pagesize=A4)
     page_width, page_height = A4
-
-    # Styles
-    styles = getSampleStyleSheet()
-    styleN = styles['Normal']
-    styleN.fontSize = 12  # override fontsize because default stylesheet is too small
-    styleN.leading = 15
-    # Add left and right indentation
-    styleN.leftIndent = 20  # Set left indentation
-    styleN.rightIndent = 20  # Set right indentation
-
-    # Create a custom style
-    custom_style = ParagraphStyle(name="CustomStyle", parent=styleN,
-                              fontSize=12,
-                              leading=15,
-                              alignment=0,  # Centered
-                              leftIndent=20,
-                              rightIndent=20,
-                              spaceBefore=10,
-                              spaceAfter=10)
-
-
-    # Main text (equivalent to `multi_cell` in FPDF)
-    text = ("This report provides a detailed summary of the input-derived data. "
+    # Prepare the content (flowable elements)    
+    cover_text = ("This report provides a detailed summary of the input-derived data. "
             "The data are analyzed by age group and sex. Analyses include the calculation of brain volume z-scores for different age groups, summary descriptive statistics of the total intracranial volume (TICV), and the age distribution in the cohort. of brain volume z-scores for different age groups."
             f"List of outliers has been generated based on z-scores outside of ±{threshold} SD. "
             "Custom options such as age filtering and cubic spline fitting have been applied to the data."
             f"<b><br/><br/>Project Description:</b> {project.description}")
     
-    custom_options_text = ( f"<br/><br/>Custom Options used:<br />"
-                            f"1. Age Range: {age_min}-{age_max} months<br/>"
-                            f"2. Outlier Threshold: ±{threshold} SD<br/>"
-                            "3. Cubic Spline Regression Fit: Degree 3<br/>"
-                            "4. Confidence Interval: 95% <br/><br/>"
+    custom_options_text = ( 
+                            # f"<br/><br/>Custom Options used:<br />"
+                            # f"1. Age Range: {age_min}-{age_max} months<br/>"
+                            # f"2. Outlier Threshold: ±{threshold} SD<br/>"
+                            # "3. Cubic Spline Regression Fit: Degree 3<br/>"
+                            # "4. Confidence Interval: 95% <br/><br/>"
                             f"<i>Input file used: {input_labels['volumetric']}</i>")
     
     stylesheet = getSampleStyleSheet()
-    stylesheet.add(ParagraphStyle(name='Paragraph', spaceAfter=20))
+    styles = getSampleStyleSheet()
+    stylesheet.add(ParagraphStyle('Cover', parent=styles['Normal'], fontSize=10, leading=18, spaceAfter=20))
     elements = []
-    elements.append(Paragraph(text + custom_options_text, stylesheet['Paragraph']))
+    elements.append(Spacer(1, 100))  # Push content down by 100 points
+    elements.append(Paragraph(cover_text, stylesheet['Cover']))
+    elements.append(Paragraph(custom_options_text, stylesheet['Cover']))
+    elements.append(Spacer(1, 24))
 
     # Define a frame for the content to flow into
-    margin = 40
-    frame = Frame(margin, -60, page_width - 2 * margin, page_height - 2 * margin, id='normal')
+    margin = 72
+    frame = Frame(margin, margin, page_width - 2 * margin, page_height - 2 * margin, id='normal')
 
     # Define the PageTemplate with the custom "beautify_report" function for adding logo/border
-    template = PageTemplate(id='CustomPage', frames=[frame], onPage=generate_on_page(user,project.label,age_min,age_max, age_unit, threshold,input_labels))
+    template = PageTemplate(id='CustomPage', frames=[frame], onPage=generate_on_page(user,project.label), onPageEnd=generate_end_page(user,project.label,header=True))
 
     # Build the document
     doc.addPageTemplates([template])
-    doc.build(elements)
+    doc.build(elements, onFirstPage=generate_on_page(user,project.label), onLaterPages=generate_end_page(user,project.label))
     log.info("Cover page has been generated.")
 
     return cover, age_min, age_max
@@ -231,6 +242,7 @@ def parse_csv(filepath, outlier_thresholds, volumetric_columns, project_label,  
     global birth_weight_icv
         
     # Example DataFrame with ages in months
+    log.info(filepath)
     df = pd.read_csv(filepath) #
     n_sessions = df['session'].nunique()  # Number of unique sessions
     log.info(f"Number of unique sessions processed:  {n_sessions}")
@@ -243,15 +255,7 @@ def parse_csv(filepath, outlier_thresholds, volumetric_columns, project_label,  
     
     # A simple heuristic: if the maximum value is above a threshold, consider it as days
     #threshold = 100  # adjust based on your dataset context
-    
-    # if df['age'].max() > threshold:
-    #     print("The age values are likely in days.")
-    #     # Rename the 'age' column to 'age_in_days'
-    #     df.rename(columns={'age': 'age_in_days'}, inplace=True)
-    #     df['age_in_months'] = df['age_in_days'] / 30.44
-    # else:
-    #     print("The age values are likely in months.")
-    #     df.rename(columns={'age': 'age_in_months'}, inplace=True)
+   
 
     if age_unit == "days" :
         df['age_in_months'] = df['age'] / 30.44
@@ -268,6 +272,12 @@ def parse_csv(filepath, outlier_thresholds, volumetric_columns, project_label,  
     log.info(f"NA Sex: {df.sex.isna().sum()}")
     log.info(f"NA Age: {df.age_in_months.isna().sum()}")
     log.info(f"NA TICV: {df['total intracranial'].isna().sum()}")
+
+    #if all of ages and sex is NA, then return and don't generate the report by issuing an error or warning
+    if len(df) == df.age_in_months.isna().sum():
+        log.error("No age or sex information available for this cohort. Please check the input data.")
+        exit (1)  # Exit with an error code
+       
 
     # Group by sex and age group
     df['sex'] = df['sex'].fillna('N/A')
@@ -304,9 +314,6 @@ def parse_csv(filepath, outlier_thresholds, volumetric_columns, project_label,  
     df['age_group'] = pd.Categorical(df['age_group'], categories=used_age_groups, ordered=True)
     
     # Define the list of columns you want to retain
-
-
-    
     # volumetric_cols = [ 'supratentorial_tissue',
     #    'supratentorial_csf', 'ventricles', 'cerebellum', 'cerebellum_csf',
     #    'brainstem', 'brainstem_csf', 'left_thalamus', 'left_caudate',
@@ -318,31 +325,23 @@ def parse_csv(filepath, outlier_thresholds, volumetric_columns, project_label,  
     # Define the columns to keep in the DataFrame
 
     columns_to_keep = ['project_label', 'subject',	'session',	'age_in_months', 'sex',	'acquisition',"age_group", "z_score"]  + volumetric_columns
-
-    # Define thresholds for outlier detection
-
+    if "input gear v" in df.columns:
+         columns_to_keep.insert(6, "input gear v")
 
     
-    # # define z-score thresholds 
-    # zscore_thresholds  = {}
-    # for col in volumetric_cols:
-    #     zscore_thresholds[col] = 2  # Set a z-score threshold of 2 for all volumetric columns
-
     # Retrieve outliers using the outlier_detection function
-    df, outliers_df = outlier_detection(df[columns_to_keep], age_column = 'age_in_months',volumetric_columns=volumetric_columns, cov_thresholds = outlier_thresholds, zscore_thresholds = outlier_thresholds)
-
+    df, outliers_df = outlier_detection(df[columns_to_keep], age_column = 'age_in_months',volumetric_columns=volumetric_columns, misc_columns= columns_to_keep, cov_thresholds = outlier_thresholds, zscore_thresholds = outlier_thresholds)
+    
     # Save the filtered DataFrame to a CSV file
     outliers_df.to_csv(os.path.join(output_dir,'outliers_list.csv'), index=False)
-
-
-
-
     outlier_n = outliers_df['session'].nunique()
 
 
     outliers_per_region = {}
     for region, threshold in outlier_thresholds.items():
+        
         outliers_per_region[region] = len(outliers_df[outliers_df[region].abs() > threshold])
+        print(region, threshold, outliers_per_region[region])
     outliers_per_region = pd.DataFrame.from_dict(outliers_per_region, orient='index')
 
 
@@ -369,7 +368,7 @@ def parse_csv(filepath, outlier_thresholds, volumetric_columns, project_label,  
     n = len(filtered_df)  # Number of observations in the filtered data
     print("@@@@ Number of observations in the filtered data:", n)
     if n == 0:
-        log.warning("No data available after filtering. Please check the age range and input data.")
+        log.warning("No data available after filtering. Please check the age range, unit, and input data.")
         #use the max and min of age_in_months instead 
         filtered_df = clean_df
         upper_age_limit = int(clean_df['age_in_months'].max())
@@ -422,37 +421,6 @@ def parse_csv(filepath, outlier_thresholds, volumetric_columns, project_label,  
     # Round the numerical columns to 2 decimal places
     summary_table = summary_table.round(2)
     summary_table.to_csv(os.path.join(output_dir,'summary_table.csv'),index=False)
-
-
-    #### Plotting outliers #####
-    #outliers_df
-    sns.kdeplot(df.loc[df['is_outlier'] == False, 'total intracranial'], label='Non-Outliers')
-    sns.kdeplot(df.loc[df['is_outlier'] == True, 'total intracranial'], label='Outliers', color='red')
-    plt.title('Distribution of TICV of outliers vs non-outliers')
-    plt.legend()
-    plt.savefig(os.path.join(workdir, "outlier_icv_plot.png"))
-
-    # Count missing values
-    #missing_counts = df[["age_in_months", "sex"]].isna().sum()
-    
-    # Plot
-    # plt.figure(figsize=(6, 4))
-    # missing_counts.plot(kind="bar", color="#D96B6B", linewidth=1)
-
-    # # Styling
-    # plt.ylabel("Number of observations")
-    # plt.title("Missing metadata")
-    # plt.xticks(rotation=0)  # Keep labels horizontal
-
-    # # Add explanation text below the plot
-    # plt.figtext(0.13, 0.28, 
-    #             "Missing sex and age information affects the usability of this report.\n"
-    #             "Please ensure the metadata is available in your project.\nn"
-    #            )  # Added padding for better spacing
-
-
-    # plt.savefig(os.path.join(output_dir, "missing_metadata.png"))
-
 
     return df, summary_table, filtered_df, n, n_projects, n_sessions, n_clean_sessions, outlier_n, outliers_per_region, project_labels, labels
 
@@ -526,21 +494,23 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     # plt.setp(ax.get_xticklabels(), rotation=45, fontsize=10)  # Shift labels slightly to the left
     # ax.grid(True)
 
-    outliers_per_region[0].plot(kind='bar')
+    sns.barplot(x=outliers_per_region[0].index,
+            y=outliers_per_region[0].values,
+            palette='Set2')
+
+    plt.xticks(rotation=45,ticks=outliers_per_region.index, fontsize=10)
     ax.set_xlabel('Region')
     ax.set_ylabel('Number of Outliers')
     ax.set_title('Number of Outliers per Region')
-    ax.set_xticklabels(rotation=45)
     plt.setp(ax.get_xticklabels(), rotation=45, fontsize=10)  # Shift labels slightly to the left
-
     plt.show()
 
 
     # Add explanation text below the plot
-    plt.figtext(0.08, 0.30, 
+    plt.figtext(0.08, 0.25, 
                 "This boxplot displays how many outliers were flagged per region.\n"
                 "Each bin represent how many values were above or below the \n"
-                f"threshold for that region when transformed using the covariance approach\n"
+                f"threshold for that region when transformed using the <b>covariance</b> approach\n"
                 f"Unique sessions: N = {n_sessions}."
                 # f"Number of sessions after removing outliers = {n_clean_sessions}\n"
                 f"\n{outlier_n} session(s) fell outside the thresholds and were flagged for further review.",
@@ -550,9 +520,9 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     # Adjust layout to ensure no overlap
     plt.subplots_adjust(top=0.85, bottom=0.4)  # Adjust to fit title and text properly
     # Save the plot only
-    zscore_plot_path = os.path.join(workdir, "zscores_agegroup_plot.png")
+    outlier_plot_path = os.path.join(workdir, "outlierROIs_plot.png")
     #plt.tight_layout()
-    plt.savefig(zscore_plot_path)
+    plt.savefig(outlier_plot_path)
     plt.close()
 
   
@@ -590,9 +560,6 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     long_summary_table = pd.DataFrame(long_rows)
 
     nsub_cols = [col for col in long_summary_table.columns if col.lower().startswith('n sub')]
-
-
-
     # Drop rows where any of those columns == 0
     long_summary_table = long_summary_table[~(long_summary_table[nsub_cols] == "0").any(axis=1)]
 
@@ -670,28 +637,6 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     plt.savefig(age_plot_path)
     plt.close()
 
-    padding = 60  # Space between plots
-
-    scaled_width1, scaled_height1 = scale_image(zscore_plot_path, 500, 500)
-    
-    plot1_x = (page_width - scaled_width1) / 2  # Centered horizontally
-    plot1_y = page_height - scaled_height1 - padding #- 50
-
-    #NO longer drawing the summary table. This will be output as a csv
-    #Age distribution plot
-    scaled_width2, scaled_height2 = scale_image(age_plot_path, 500, 500)
-    plot2_x = (page_width - scaled_width2) / 2  # Centered horizontally
-    plot2_y = plot1_y - scaled_height2 + 100  #- plot1_y - padding 
-
-
-    
-    pdf.drawImage(zscore_plot_path, plot1_x, plot1_y, width= scaled_width1, height=scaled_height1)
-    pdf.drawImage(age_plot_path, plot2_x, plot2_y, width= scaled_width2, height=scaled_height2)   # Position plot higher on the page
-    
-    pdf = beautify_report(pdf,False,True)
-    pdf.showPage()
-
-    
 
     # --- Plot 4: Polynomial fit with degree 3 (cubic) using sns.regplot --- #
     # Create figure with full A4 size using plt.figure() (not plt.subplots)
@@ -699,38 +644,91 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     ax = fig.add_axes([0.125, 0.5, 0.8, 0.4])  # Left, bottom, width, height (adjust these as needed)
     ax.grid(True)
 
-    print(filtered_df['sex'].value_counts())
+    df = filtered_df.dropna(subset=["age_in_months", "total intracranial"])
+    X = df[['age_in_months']].values
+    y = df['total intracranial'].values.reshape(-1, 1)
 
-    for sex in filtered_df['sex'].unique():
-        df_sex = filtered_df[filtered_df['sex'] == sex]
-        if df_sex.shape[0] < 5:  # fewer than your n_knots (5) → skip
-            print(f"Skipping {sex}: only {df_sex.shape[0]} samples")
-            continue
+    # Step 2: Stack X and y into feature space for GMM
+    Xy = np.hstack([X, y])  # shape: (n_samples, 2)
 
-        X = df_sex[['age_in_months']].values
-        y = df_sex['total intracranial'].values
+    # Step 3: Fit GMM to find latent growth trajectories
+    n_classes = 2  # Try 2 or 3
+    gmm = GaussianMixture(n_components=n_classes, covariance_type='full', random_state=42)
+    df['class'] = gmm.fit_predict(Xy)
 
+    # Optional: get posterior probabilities (i.e., how confident the model is)
+    probs = gmm.predict_proba(Xy)
+    for i in range(n_classes):
+        df[f'class_{i}_prob'] = probs[:, i]
+
+    # Save to CSV with key columns
+    output_cols = ['subject', 'session','age_in_months','sex', 'total intracranial', 'class'] + [f'class_{i}_prob' for i in range(n_classes)]
+    df[output_cols].to_csv(os.path.join(output_dir,f"gmm_class_assignments_{'_'.join(project_labels)}.csv"), index=False)
+
+    df.reset_index().rename(columns={"index": "sample_id"})[output_cols].to_csv(os.path.join(output_dir,f"gmm_class_assignments_{'_'.join(project_labels)}.csv"), index=False)
+
+
+    # Step 4: Plot each class with its own polynomial regression
+    colors = ['tab:blue', 'tab:orange', 'tab:green']
+
+    for cls in range(n_classes):
+        sub_df = df[df['class'] == cls]
+        X_cls = sub_df[['age_in_months']].values
+        y_cls = sub_df['total intracranial'].values
+
+        # Fit polynomial regression
         model = make_pipeline(
-            SplineTransformer(degree=3, n_knots=5, include_bias=False),
+            PolynomialFeatures(degree=3, include_bias=False),
             LinearRegression()
         )
-        model.fit(X, y)
+        model.fit(X_cls, y_cls)
 
-        X_test = np.linspace(X.min(), X.max(), 200).reshape(-1, 1)
+        # Predict
+        X_test = np.linspace(X_cls.min(), X_cls.max(), 200).reshape(-1, 1)
         y_pred = model.predict(X_test)
 
-        plt.scatter(X, y, alpha=0.5, label=f"{sex} data")
-        plt.plot(X_test, y_pred, label=f"{sex} spline fit", linewidth=2)
+        # Plot
+        plt.scatter(X_cls, y_cls, alpha=0.3, label=f"Class {cls} data", color=colors[cls])
+        plt.plot(X_test, y_pred, label=f"Class {cls} fit", color=colors[cls], linewidth=2)
 
     plt.xlabel("Age (Months)")
-    plt.ylabel("Brain Volume vs. Age, split by Sex")
-    plt.title("Cubic Spline Regression by Sex")
-    plt.legend()
+    plt.ylabel("Total Intracranial Volume")
+    plt.title("Growth Mixture Model (GMM proxy using GMM + PolyFit)")
+    
+
+
+    # for sex in filtered_df['sex'].unique():
+    #     df_sex = filtered_df[filtered_df['sex'] == sex]
+    #     if df_sex.shape[0] < 5:  # fewer than your n_knots (5) → skip
+    #         print(f"Skipping {sex}: only {df_sex.shape[0]} samples")
+    #         continue
+
+    #     X = df_sex[['age_in_months']].values
+    #     y = df_sex['total intracranial'].values
+
+    #     model = make_pipeline(
+    #         SplineTransformer(degree=3, n_knots=5, include_bias=False),
+    #         LinearRegression()
+    #     )
+    #     model.fit(X, y)
+
+    #     X_test = np.linspace(X.min(), X.max(), 200).reshape(-1, 1)
+    #     y_pred = model.predict(X_test)
+
+    #     plt.scatter(X, y, alpha=0.5, label=f"{sex} data")
+    #     plt.plot(X_test, y_pred, label=f"{sex} spline fit", linewidth=2)
+
+    # plt.xlabel("Age (Months)")
+    # plt.ylabel("Brain Volume vs. Age, split by Sex")
+    # plt.title("Cubic Spline Regression by Sex")
+    # plt.legend()
     # Add explanation text below the plot
-    plt.figtext(0.06, 0.28, f"This scatter plot shows the relationship between age and total intracranial volume (TICV),\n"
-                            f"with a spline-based regression model (B-splines, degree 3) fitted separately for each sex.\n"
-                            f"The smoothed trends allow for non-linear changes in TICV across age, and individual data points "
-                            f"are overlaid to illustrate distribution.\n"
+    plt.figtext(0.06, 0.18, f"This scatter plot shows the relationship between age and total intracranial volume (TICV),\n"
+                            f"with a Growth Mixture Model (GMM) applied to identify distinct latent developmental trajectories.\n"
+                            f"The GMM clusters individuals into subgroups based on similarities in TICV growth patterns across age,\n"
+                            f"allowing for the detection of non-obvious or non-linear trends that may vary between subpopulations.\n"
+                            f"Each class is visualized with a separate curve, and individual data points are shown to illustrate distribution.\n"
+                            f"Class assignments are extracted and output in a CSV for for further analysis.\n\n"
                             f"Data points outside the initial study {threshold} IQR range are excluded from the plot.\n\n"
                             f"Plot limits set to {age_min}-{age_max} months, N = {n}.\n"
                             f"Included projects = {', '.join(project_labels)}",
@@ -740,33 +738,53 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
     # Adjust layout to ensure no overlap
     plt.subplots_adjust(top=0.85, bottom=0.2)  # Adjust to fit title and text properly
     plt.legend()
-    scatter_plot_path = os.path.join(workdir, "ageVol_scatter_plot.png")
-    plt.savefig(scatter_plot_path)
+    GMM_plot_path = os.path.join(workdir, "ageVol_GMM_plot.png")
+    plt.savefig(GMM_plot_path)
     plt.close()
+   
+    
+    elements = []
+     # Output PDF path
+    doc = SimpleDocTemplate(report, pagesize=A4)
 
-
-    # volumetrics_to_plot = ['total cerebral white matter', 'total cerebral cortex', 'hippocampus', 
-    #                'thalamus', 'amygdala', 'putamen', 'caudate']
+    # Get the current timestamp
+    current_timestamp = datetime.now()
+    # Format the timestamp as a string
+    formatted_timestamp = current_timestamp.strftime('%Y-%m-%d_%H-%M-%S')
+    report = os.path.join(workdir,f"data_report.pdf")
+    
+     # --- Plot: Histogram of outliers --- #
+    if os.path.exists(outlier_plot_path):
+        log.info(f"Path exists {outlier_plot_path}")
+        elements.append(Paragraph("<b>Outlier Detection</b>", styles['Heading2']))
+        width, height = scale_image(outlier_plot_path, 500, 500)
+        elements.append(Image(outlier_plot_path, width=width, height=height))
+        elements.append(Spacer(1, 12))
+    else:
+        log.warning(f"Outlier plot not found at {outlier_plot_path}")
+        
+    
+    # --- Plot: Age distribution ---
+    if os.path.exists(age_plot_path):
+        log.info(f"Path exists {age_plot_path}")
+        width, height = scale_image(age_plot_path, 500, 500)
+        elements.append(Image(age_plot_path, width=width, height=height))
+        elements.append(Spacer(1, 12))
+    else:
+        log.warning(f"Age distribution not found at {age_plot_path}")
 
     
-    scaled_width1, scaled_height1 = scale_image(scatter_plot_path, 500, 500)
-    
-    plot1_x = (page_width - scaled_width1) / 2  # Centered horizontally
-    plot1_y = page_height - scaled_height1 - 50 #- 50
+    # --- Plot: GMM --- #
+    if os.path.exists(GMM_plot_path):
+        log.info(f"Path exists {GMM_plot_path}")
+        width, height = scale_image(GMM_plot_path, 500, 500)
+        elements.append(Spacer(1, 24))
+        elements.append(Image(GMM_plot_path, width=width, height=height))
+        elements.append(Spacer(1, 12))
+    else:
+        log.warning(f"Scatter plot not found at {GMM_plot_path}")
 
-    scaled_width2, scaled_height2 = scale_image(scatter_plot_path, 500, 500)
-    plot2_x = (page_width - scaled_width2) / 2  # Centered horizontally
-    plot2_y = plot1_y - (scaled_height2 / 2) - 100 #- plot1_y - padding 
-
-
-    pdf.drawImage(scatter_plot_path, plot1_x, plot1_y, width=scaled_width1, height=scaled_height1)   # Position plot higher on the page    
-    #pdf.drawImage(scatter_plot_path, plot2_x, plot2_y, width= scaled_width2, height=scaled_height2)   # Position plot higher on the page    
-
-    pdf = beautify_report(pdf,False,True)
-    pdf.showPage()    
-    
-
-    # --- Plot 5: Growth curves--- #
+    # --- Plot: Growth curves--- #
 
     if growth_curve:
 
@@ -847,20 +865,26 @@ def create_data_report(df, summary_table, filtered_df, n, n_projects, n_sessions
         plt.savefig(growth_plot_path,bbox_inches='tight')
 
 
+        if os.path.exists(growth_plot_path):
+            log.info(f"Path exists {growth_plot_path}")
+            width, height = scale_image(growth_plot_path, 500, 500)
+            elements.append(Image(growth_plot_path, width=width, height=height))
+            elements.append(Spacer(1, 12))
+        else:
+            log.warning(f"Growth plot not found at {GMM_plot_path}")
 
-        scaled_width1, scaled_height1 = scale_image(growth_plot_path, 500, 500)
+
+    # --- Set up PageTemplate for all pages ---
+    fw = flywheel.Client(api_key=api_key)
+    user = f"{fw.get_current_user().firstname} {fw.get_current_user().lastname} [{fw.get_current_user().email}]"
+    margin = 40
+    frame = Frame(margin, margin, page_width - 2 * margin, page_height - 2 * margin, id='normal')
+    template = PageTemplate(id='CustomPage', frames=[frame], onPage=generate_end_page(user, {', '.join(project_labels)}))
+    doc.addPageTemplates([template])
+
+    # --- Build the document ---
     
-        plot1_x = (page_width - scaled_width1) / 2  # Centered horizontally
-        plot1_y = page_height - scaled_height1 - 50 #- 50
-
-
-        pdf.drawImage(growth_plot_path, plot1_x, plot1_y, width=scaled_width1, height=scaled_height1)   # Position plot higher on the page    
-
-        pdf = beautify_report(pdf,False,True)
-        pdf.showPage()    
-    
-
-    pdf.save()  # Save the PDF
+    doc.build(elements, onFirstPage=generate_end_page(user, {', '.join(project_labels)}), onLaterPages=generate_end_page(user, {', '.join(project_labels)}))
     print("PDF summary report has been generated.")
     return report
 
@@ -878,21 +902,29 @@ def merge_pdfs(project_label, api_key, cover, report, final_report):
     print("Data Report: ", report)
     print("Final Report: ", final_report)
 
+    merger = PdfMerger()
     # Append the cover page
     merger.append(cover)
 
     # Append the data report
     merger.append(report)
-
+   
     # Write to a final PDF
     merger.write(final_report)
     merger.close()
+    log.info(f'Data Report saved {final_report}')
+    
+    try:
+        project  = fw.projects.find_one(f'label={project_label}')
+        project = project.reload() 
 
+        custom_name = final_report.split('/')[-1]
+        project.upload_file(final_report, filename=custom_name,classification="Report")
+        log.info("Report has been uploaded to the project's information tab.")
 
-    custom_name = final_report.split('/')[-1]
-    project.upload_file(final_report, filename=custom_name,classification="Report")
-    log.info("Report has been uploaded to the project's information tab.")
+    except Exception as e:
+        log.error(e)
 
-
+    return final_report
     
     

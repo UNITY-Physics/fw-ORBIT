@@ -177,37 +177,28 @@ def impute_information(context,vols):
     # Check if the sex or age column has empty values
     columns = ['sex','age','birth_length_cm','birth_weight_kg','current_hc_cm']
     futures = []
-    
-    #minimorph's output is dicom_age_in_months
-    # for age_column in ['dicom_age_in_months', 'template_age']:
-    #     if age_column in df.columns:
-    #         log.info(f"Extracting age from {age_column} column")
-    #         # Step 1: Apply regex to extract digits
-    #         df['age'] = df[age_column].str.replace(r'[a-zA-Z]', '', regex=True)
-    #         # Step 2: Convert to numeric (this will turn non-convertible entries to NaN)
-    #         df['age'] = pd.to_numeric(df[age_column], errors='coerce')
-
         
     df.loc[df['age'] < 0, 'age'] = pd.NA #some sites fill in age_at_scan with one month before DOB
     mask = df['sex'].isna() | (df['age'] < 0) | (df['age'].isna())
     
-    start_time = time.time()
+    if mask.any():
+        start_time = time.time()
 
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        futures = [
-            executor.submit(impute_row, index, row, project, columns, log)
-            for index, row in df.iterrows()
-        ]
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [
+                executor.submit(impute_row, index, row, project, columns, log)
+                for index, row in df.iterrows()
+            ]
 
-        for future in as_completed(futures):
-            index, result = future.result()
-            for col, val in result.items():
-                if val is not None:
-                    df.at[index, col] = val
-                    print("Updating the value in the dataframe" + str(index) + " " + col + " " + str(val))
-    
-    #count time elapsed
-    log.info(f"Time elapsed: {time.time() - start_time} seconds")
+            for future in as_completed(futures):
+                index, result = future.result()
+                for col, val in result.items():
+                    if val is not None:
+                        df.at[index, col] = val
+                        #print("Updating the value in the dataframe" + str(index) + " " + col + " " + str(val))
+        
+        #count time elapsed
+        log.info(f"Time elapsed: {time.time() - start_time} seconds")
 
     #Harmonise sex values
     sex_map = {
@@ -264,9 +255,8 @@ def rename_columns (vols):
 
             with open('/flywheel/v0/utils/thresholds.yml', 'r') as f:
                 threshold_dictionary = yaml.load(f, Loader=yaml.SafeLoader)
-                outlier_thresholds = threshold_dictionary[keyword]
-                volumetric_cols = threshold_dictionary[keyword+ '_volumetric_columns']["volumetric_columns"]
- 
+                outlier_thresholds = threshold_dictionary[keyword]['thresholds']
+                volumetric_cols = threshold_dictionary[keyword]['volumetric_cols']
  
             column_mapping = name_key_maping[keyword]
             df.rename(columns=column_mapping,inplace=True)

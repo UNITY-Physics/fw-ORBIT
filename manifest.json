@@ -1,6 +1,6 @@
 {
   "author": "Niall Bourke, Hajer Karoui",
-  "cite": "VoluMetrics: A tool for the automated extraction of brain volume metrics from MRI scans processed on the Flywheel platform. ",
+  "cite": "ORBIT: Outlier detection and Representation of Brain data, providing Insights on developmental Trajectories.",
   "command": "python3 /flywheel/v0/run.py",
   "config": {
     "age_range": {
@@ -85,7 +85,7 @@
     },
     "gear-builder": {
       "category": "analysis",
-      "image": "flywheel/volumetrics:0.0.24"
+      "image": "flywheel/orbit:0.0.1"
     },
     "kcl-app-binary": "app/main.py",
     "kcl-app-modalities": [
@@ -147,11 +147,11 @@
       "optional": false
     }
   },
-  "label": "VoluMetrics",
+  "label": "ORBIT (VoluMetrics)",
   "license": "MIT",
   "maintainer": "Hajer Karoui <hajer.karoui@kcl.ac.uk> ",
-  "name": "volumetrics",
-  "source": "",
+  "name": "orbit",
+  "source": "https://github.com/UNITY-Physics/fw-VoluMetrics",
   "url": "",
-  "version": "0.0.24"
+  "version": "0.0.1"
 }

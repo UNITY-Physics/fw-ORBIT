@@ -81,7 +81,7 @@ def threshold_outlier_detection(data,skip_covariance = False, thresholds: dict =
     return cov_differences[list(thresholds.keys())+["outliers"]].reset_index(drop=True)
         
 
-def outlier_detection(df: pd.DataFrame, age_column: str, volumetric_columns: list, cov_thresholds: dict = {},zscore_thresholds: dict = {}) -> pd.DataFrame:
+def outlier_detection(df: pd.DataFrame, age_column: str, volumetric_columns: list, misc_columns: list, cov_thresholds: dict = {},zscore_thresholds: dict = {}) -> pd.DataFrame:
     """
     Detect outliers in a DataFrame using various methods.
     
@@ -89,6 +89,7 @@ def outlier_detection(df: pd.DataFrame, age_column: str, volumetric_columns: lis
     - df: pd.DataFrame, the input data.
     - age_column: str, the name of the age column to analyze.
     - volumetric_columns: list, the names of the volumetric columns to analyze.
+    - misc_columns: list, list of additional columns to include in the output.
     - method: str, the method to use for outlier detection. Options are 'zscore', 'pca', 'lof', 'isolation_forest'.
     - plot: bool, whether to plot the results.
     - explained: bool, whether to compute explainable differences.
@@ -107,24 +108,30 @@ def outlier_detection(df: pd.DataFrame, age_column: str, volumetric_columns: lis
     df = df.copy()
     outliers = pd.DataFrame()
     z_score_agg = pd.DataFrame()
-
     #Perform outlier detection for each age group
     for age in df[age_column].unique():
         age_df = df[df[age_column] == age]
-
+        print("Is age_df empty", age_df.empty)
 
         if not age_df.empty:
             # perform z-score normalization
             z_scores = (age_df[volumetric_columns] - age_df[volumetric_columns].mean()) / age_df[volumetric_columns].std()
-            
-
 
             # perform outlier detection based on the covariance
             outliers_grouped = threshold_outlier_detection(z_scores, thresholds=cov_thresholds)
             zscore_outliers = threshold_outlier_detection(z_scores, skip_covariance=True, thresholds=zscore_thresholds)
             outliers_grouped["zscore_outliers"] = zscore_outliers["outliers"]
-            outliers_grouped["subject"] = age_df["subject"].values
-            outliers_grouped["session"] = age_df["session"].values
+            for col in misc_columns:
+                if col in age_df.columns:
+                    outliers_grouped[col] = age_df[col].values
+                else:
+                    outliers_grouped[col] = np.nan
+            
+            # outliers_grouped["project_label"] = age_df["project_label"].values
+            # outliers_grouped["subject"] = age_df["subject"].values
+            # outliers_grouped["session"] = age_df["session"].values
+            # outliers_grouped["input gear v"] = age_df["input gear v"].values
+            
 
 
             # filter to keep only rows with outliers
@@ -152,6 +159,14 @@ def outlier_detection(df: pd.DataFrame, age_column: str, volumetric_columns: lis
     tag_only = outliers[["subject", "is_outlier"]].drop_duplicates()
     df = df.copy().merge(tag_only, how='left', on='subject')
     df['is_outlier'] = df['is_outlier'].fillna(0).astype(bool)
+    
+    first_cols = ["project_label", "subject", "session","is_outlier"]
+    if "input gear v" in df.columns:
+         first_cols.append("input gear v")
+    # Any other columns that are present
+    other_cols = [col for col in outliers.columns if col not in first_cols]
+    # Reorder
+    outliers = outliers[first_cols + other_cols]
 
     # cleanup
     df.drop(columns = ["Unnamed: 0"], inplace=True, errors='ignore')
