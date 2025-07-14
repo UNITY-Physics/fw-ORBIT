@@ -127,13 +127,6 @@ def outlier_detection(df: pd.DataFrame, age_column: str, volumetric_columns: lis
                 else:
                     outliers_grouped[col] = np.nan
             
-            # outliers_grouped["project_label"] = age_df["project_label"].values
-            # outliers_grouped["subject"] = age_df["subject"].values
-            # outliers_grouped["session"] = age_df["session"].values
-            # outliers_grouped["input gear v"] = age_df["input gear v"].values
-            
-
-
             # filter to keep only rows with outliers
             outliers_grouped = outliers_grouped[outliers_grouped["outliers"] > 0]
 

@@ -39,3 +39,4 @@ tzlocal
 urllib3
 scikit-learn
 PyYAML
+patsy

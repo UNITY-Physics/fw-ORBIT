@@ -1,8 +1,8 @@
 #!/usr/bin/env bash 
 
 GEAR=fw-VoluMetrics
-IMAGE=flywheel/volumetrics:$1
-LOG=volumetrics-$1-$2
+IMAGE=flywheel/orbit:$1
+LOG=orbit-$1-$2
 
 echo $IMAGE $LOG
 
