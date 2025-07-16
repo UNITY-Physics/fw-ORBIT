@@ -8,7 +8,7 @@ minimorph : {"thresholds": {"supratentorial tissue": 2,
             'left caudate': 1.5,
             'right putamen': 1.5,
             'left putamen': 1.5,
-            'ventricles': 2,
+            # 'ventricles': 2,
             'brainstem csf': 1.5},
             
             "volumetric_cols": ["supratentorial tissue",
@@ -41,10 +41,10 @@ recon-all : {"thresholds": {'right thalamus': 1.5,
             'left caudate': 1.5,
             'right putamen': 1.5,
             'left putamen': 1.5,
-            'left lateral ventricle': 2,
-            'left inferior lateral ventricle': 2,
-            'right lateral ventricle': 2,
-            'right inferior lateral ventricle': 2
+            # 'left lateral ventricle': 2,
+            # 'left inferior lateral ventricle': 2,
+            # 'right lateral ventricle': 2,
+            # 'right inferior lateral ventricle': 2
             #3rd ventricle,4th ventricle
             }, 
             "volumetric_cols": [ "left cerebral white matter",
